@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inquiry Form — SunFood</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --orange: #EC4899; --orange-light: rgba(252, 231, 243, 0.55); --orange-mid: #BE185D;
+  --ink: #1A1714; --ink-soft: #46403A; --ink-muted: #8C8580;
+  --bg-1: #FFE4F1; --bg-2: #FFC8E1; --bg-3: #FFB0D5; --bg-4: #FF8FBE;
+  --white: rgba(255, 255, 255, 0.55);
+  --glass: rgba(255, 255, 255, 0.45);
+  --glass-strong: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-shadow: 0 8px 32px rgba(236, 72, 153, 0.12), inset 0 1px 0 rgba(255,255,255,0.85), inset 0 -1px 0 rgba(236,72,153,0.05);
+  --drop-shadow: 0 10px 40px rgba(236, 72, 153, 0.18), 0 2px 8px rgba(236, 72, 153, 0.08), inset 0 1px 1px rgba(255,255,255,0.9);
+  --border: rgba(255, 255, 255, 0.6); --border-strong: rgba(236, 72, 153, 0.2);
+  --red: #C0392B; --red-light: rgba(253, 240, 238, 0.7); --green: #1E7A4A;
+  --radius: 16px; --radius-sm: 12px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: "Sarabun", sans-serif; color: var(--ink); min-height: 100vh; font-size: 15px; line-height: 1.6;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(251, 207, 232, 0.75) 0%, transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(244, 114, 182, 0.55) 0%, transparent 50%),
+    radial-gradient(circle at 75% 85%, rgba(252, 200, 225, 0.65) 0%, transparent 50%),
+    radial-gradient(circle at 20% 90%, rgba(236, 72, 153, 0.4) 0%, transparent 50%),
+    linear-gradient(135deg, #FFE4F1 0%, #FFC8E1 50%, #FFA8CE 100%);
+  background-attachment: fixed;
+  position: relative; overflow-x: hidden;
+}
+
+/* floating glass droplets in background */
+body::before, body::after {
+  content: ''; position: fixed; border-radius: 50%; pointer-events: none; z-index: 0;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.6), rgba(255,255,255,0.15) 60%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.4);
+  box-shadow: 0 8px 32px rgba(236, 72, 153, 0.12);
+}
+body::before { width: 280px; height: 280px; top: 8%; right: -60px; animation: float 18s ease-in-out infinite; }
+body::after { width: 200px; height: 200px; bottom: 12%; left: -50px; animation: float 22s ease-in-out infinite reverse; }
+@keyframes float {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  50% { transform: translate(20px, -30px) scale(1.05); }
+}
+
+/* ── HEADER ── */
+.site-header {
+  position: relative; z-index: 1;
+  background: rgba(26, 23, 20, 0.55);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 44px;
+}
+.logo-text { font-family: "Kanit", sans-serif; font-size: 16px; font-weight: 600; color: #FAF8F4; letter-spacing: 0.12em; }
+.logo-text span { color: #F9A8D4; }
+.header-tag { font-size: 10px; color: rgba(255,255,255,0.45); letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* ── HERO ── */
+.hero {
+  position: relative; z-index: 1;
+  background: rgba(26, 23, 20, 0.45);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  color: white; padding: 12px 32px;
+  border-bottom: 1px solid rgba(251, 207, 232, 0.4);
+  box-shadow: 0 4px 24px rgba(236, 72, 153, 0.15);
+}
+.hero-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(251,207,232,0.18); backdrop-filter: blur(10px); border: 1px solid rgba(251,207,232,0.4); border-radius: 20px; padding: 3px 12px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #FBCFE8; margin-bottom: 5px; }
+.hero h1 { font-family: "Kanit", sans-serif; font-size: 16px; font-weight: 500; }
+
+/* ── TAB WIZARD ── */
+.wizard-wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 24px 24px 0; }
+.tab-bar {
+  display: flex;
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  overflow: hidden; margin-bottom: 20px;
+  box-shadow: var(--glass-shadow);
+}
+.tab-item {
+  flex: 1; padding: 14px 8px; cursor: pointer;
+  border-right: 1px solid rgba(255,255,255,0.4);
+  display: flex; align-items: center; gap: 9px;
+  transition: all 0.25s ease; position: relative;
+  user-select: none;
+}
+.tab-item:last-child { border-right: none; }
+.tab-item.active { background: linear-gradient(135deg, rgba(255,255,255,0.7), rgba(252,231,243,0.5)); }
+.tab-item.done { background: rgba(240, 251, 245, 0.55); cursor: pointer; }
+.tab-item.locked { opacity: 0.5; cursor: not-allowed; }
+.tab-item.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--orange), transparent); }
+.tab-item.done::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--green), transparent); }
+.tab-bubble {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; transition: all 0.25s;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), rgba(232,221,210,0.4));
+  color: var(--ink-muted);
+  border: 1px solid rgba(255,255,255,0.6);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.9), 0 2px 6px rgba(236,72,153,0.08);
+}
+.tab-item.active .tab-bubble {
+  background: radial-gradient(circle at 30% 30%, #F9A8D4, var(--orange) 70%);
+  color: white;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 4px 12px rgba(236,72,153,0.4);
+}
+.tab-item.done .tab-bubble { background: radial-gradient(circle at 30% 30%, #4FC081, var(--green) 70%); color: white; font-size: 13px; box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 4px 12px rgba(30,122,74,0.35); }
+.tab-info .tab-num { font-size: 10px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.tab-info .tab-name { font-size: 12px; font-weight: 500; color: var(--ink); margin-top: 1px; }
+.tab-item.active .tab-name { color: var(--orange-mid); }
+.tab-item.done .tab-name { color: var(--green); }
+.tab-item.locked .tab-name { color: var(--ink-muted); }
+
+/* ── PANELS ── */
+.form-wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 0 24px 80px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: panelIn 0.4s ease; }
+@keyframes panelIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── CARD ── water droplet glass */
+.card {
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 24px 24px 20px; margin-bottom: 16px;
+  box-shadow: var(--drop-shadow);
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute; top: -1px; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+  pointer-events: none;
+}
+.card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding-bottom: 13px; border-bottom: 1px solid rgba(255,255,255,0.5); }
+.card-icon {
+  width: 38px; height: 38px;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(252,231,243,0.5) 70%);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.9), 0 4px 12px rgba(236,72,153,0.15);
+}
+.card-title { font-family: "Kanit", sans-serif; font-size: 15px; font-weight: 500; color: var(--ink); }
+.card-sub { font-size: 12px; color: var(--ink-soft); margin-top: 1px; }
+
+/* ── GRID ── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+/* ── FIELD ── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 12px; font-weight: 500; color: var(--ink-soft); letter-spacing: 0.03em; }
+.field label .req { color: var(--red); margin-left: 2px; }
+input, select, textarea {
+  width: 100%; padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: var(--radius-sm);
+  font-family: "Sarabun", sans-serif; font-size: 14px; color: var(--ink);
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: all 0.25s ease; appearance: none;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.7), 0 2px 6px rgba(236,72,153,0.05);
+}
+input:hover, select:hover, textarea:hover { background: rgba(255,255,255,0.7); }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: rgba(236,72,153,0.5);
+  background: rgba(255,255,255,0.85);
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.7), 0 0 0 4px rgba(236,72,153,0.15), 0 4px 12px rgba(236,72,153,0.1);
+}
+textarea { resize: vertical; min-height: 80px; }
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23BE185D' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px;
+}
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button { display: none; }
+
+/* ── PRODUCT BLOCK ── */
+.prod-block {
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 12px;
+  background: rgba(255,255,255,0.35);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.7), 0 4px 16px rgba(236,72,153,0.06);
+}
+.prod-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+.prod-label { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--orange-mid); }
+.prod-dot { width: 8px; height: 8px; background: radial-gradient(circle at 30% 30%, #F9A8D4, var(--orange)); border-radius: 50%; box-shadow: 0 0 6px rgba(236,72,153,0.5); }
+.btn-rm { width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.7); background: rgba(255,255,255,0.5); backdrop-filter: blur(8px); font-size: 15px; color: var(--ink-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: inset 0 1px 1px rgba(255,255,255,0.8); }
+.btn-rm:hover { background: var(--red-light); border-color: rgba(192,57,43,0.4); color: var(--red); }
+.btn-add { display: none !important; }
+
+/* ── NAV BUTTONS ── */
+.nav-row { display: flex; gap: 10px; margin-top: 6px; }
+.btn-back {
+  flex-shrink: 0; display: flex; align-items: center; gap: 7px;
+  padding: 12px 22px;
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  font-family: "Sarabun", sans-serif; font-size: 15px; color: var(--ink-soft); cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.8), 0 4px 12px rgba(236,72,153,0.06);
+}
+.btn-back:hover { background: rgba(255,255,255,0.75); transform: translateY(-1px); }
+.btn-next {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 24px;
+  background: linear-gradient(135deg, rgba(251,207,232,0.95), rgba(236,72,153,0.95));
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  color: white; border: 1px solid rgba(255,255,255,0.4);
+  border-radius: var(--radius);
+  font-family: "Kanit", sans-serif; font-size: 15px; font-weight: 500;
+  cursor: pointer; transition: all 0.25s; letter-spacing: 0.02em;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), 0 8px 24px rgba(236,72,153,0.3);
+}
+.btn-next:hover { transform: translateY(-2px); box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), 0 12px 32px rgba(236,72,153,0.4); }
+.btn-submit-final {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 24px;
+  background: linear-gradient(135deg, rgba(70,64,58,0.95), rgba(26,23,20,0.95));
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  color: white; border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius);
+  font-family: "Kanit", sans-serif; font-size: 15px; font-weight: 500;
+  cursor: pointer; transition: all 0.25s; letter-spacing: 0.02em;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.2), 0 8px 24px rgba(26,23,20,0.3);
+}
+.btn-submit-final:hover { transform: translateY(-2px); box-shadow: inset 0 1px 1px rgba(255,255,255,0.2), 0 12px 32px rgba(26,23,20,0.4); }
+
+.divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(236,72,153,0.2), transparent); margin: 16px 0; }
+
+/* ── SUCCESS ── */
+.success-overlay {
+  display: none; position: fixed; inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255,232,214,0.85), rgba(255,200,160,0.9));
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  z-index: 200; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px;
+}
+.success-overlay.show { display: flex; }
+.success-icon {
+  width: 84px; height: 84px;
+  background: radial-gradient(circle at 30% 30%, #F9A8D4, var(--orange) 70%);
+  border: 2px solid rgba(255,255,255,0.6);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; color: white; margin-bottom: 22px;
+  box-shadow: inset 0 2px 4px rgba(255,255,255,0.5), 0 12px 40px rgba(236,72,153,0.5);
+  animation: pop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes pop { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+.success-title { font-family: "Kanit", sans-serif; font-size: 28px; font-weight: 500; margin-bottom: 10px; color: var(--ink); }
+.success-sub { font-size: 14px; color: var(--ink-soft); max-width: 360px; line-height: 1.75; }
+.success-ref {
+  margin-top: 18px; font-size: 13px; font-weight: 600; color: var(--orange-mid); letter-spacing: 0.06em;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  padding: 10px 24px; border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.7);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.8), 0 4px 16px rgba(236,72,153,0.15);
+}
+.success-note { margin-top: 14px; font-size: 12px; color: var(--ink-muted); }
+.btn-new {
+  margin-top: 20px; padding: 11px 30px;
+  background: linear-gradient(135deg, rgba(70,64,58,0.9), rgba(26,23,20,0.9));
+  color: white; border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius);
+  font-family: "Kanit", sans-serif; font-size: 14px; cursor: pointer;
+  box-shadow: 0 8px 24px rgba(26,23,20,0.25);
+  transition: all 0.25s;
+}
+.btn-new:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(26,23,20,0.35); }
+
+/* ── LOGIN ── */
+.login-overlay {
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(251,207,232,0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(236,72,153,0.25) 0%, transparent 50%),
+    linear-gradient(135deg, #1A1714 0%, #2C2520 100%);
+  display: flex; align-items: center; justify-content: center; z-index: 999;
+}
+.login-box {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(28px) saturate(180%); -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 24px;
+  padding: 40px 36px; width: 340px;
+  display: flex; flex-direction: column; align-items: center; gap: 22px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1);
+}
+.login-logo { font-family: "Kanit", sans-serif; font-size: 28px; font-weight: 600; color: #FAF8F4; letter-spacing: 0.14em; }
+.login-logo span { color: #F9A8D4; }
+.login-subtitle { font-family: "Kanit", sans-serif; font-size: 13px; font-weight: 400; color: rgba(255,255,255,0.4); letter-spacing: 0.1em; text-transform: uppercase; margin-top: -14px; }
+.login-label { font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.5); letter-spacing: 0.07em; text-transform: uppercase; align-self: flex-start; margin-bottom: -12px; }
+.user-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+.user-btn {
+  padding: 14px 10px; border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px);
+  font-family: "Kanit", sans-serif; font-size: 15px; font-weight: 500;
+  color: rgba(255,255,255,0.8); cursor: pointer; letter-spacing: 0.06em;
+  transition: all 0.25s; text-align: center;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+}
+.user-btn:hover {
+  background: linear-gradient(135deg, rgba(251,207,232,0.3), rgba(236,72,153,0.2));
+  border-color: rgba(251,207,232,0.5);
+  color: #FBCFE8;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(236,72,153,0.25);
+}
+.login-footer { font-size: 10px; color: rgba(255,255,255,0.25); letter-spacing: 0.07em; }
+.user-tag {
+  display: none; position: fixed; top: 14px; right: 16px; z-index: 50;
+  background: linear-gradient(135deg, rgba(251,207,232,0.95), rgba(236,72,153,0.95));
+  backdrop-filter: blur(12px);
+  color: white; font-family: "Kanit", sans-serif; font-size: 12px; font-weight: 600;
+  padding: 6px 16px; border-radius: 24px;
+  letter-spacing: 0.06em;
+  border: 1px solid rgba(255,255,255,0.4);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 6px 18px rgba(236,72,153,0.35);
+}
+
+/* ── BTN ADD MORE ── */
+.btn-add-more {
+  flex-shrink: 0; display: flex; align-items: center; gap: 7px;
+  padding: 12px 18px;
+  border: 1px solid rgba(236,72,153,0.4);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  font-family: "Kanit", sans-serif; font-size: 14px; font-weight: 500;
+  color: var(--orange-mid); cursor: pointer;
+  transition: all 0.25s; white-space: nowrap;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.8), 0 4px 12px rgba(236,72,153,0.1);
+}
+.btn-add-more:hover {
+  background: linear-gradient(135deg, rgba(252,231,243,0.7), rgba(252,231,243,0.5));
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.8), 0 8px 20px rgba(236,72,153,0.15);
+}
+
+/* ── SESSION COUNTER ── */
+.session-bar {
+  background: linear-gradient(135deg, rgba(252,231,243,0.55), rgba(252,231,243,0.4));
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--radius-sm);
+  padding: 12px 18px; margin-bottom: 14px; display: none; font-size: 13px; color: var(--orange-mid);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.7), 0 4px 16px rgba(236,72,153,0.1);
+}
+.session-bar.show { display: flex; align-items: center; justify-content: space-between; }
+.session-bar strong { font-family: "Kanit", sans-serif; font-size: 14px; }
+.session-list { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+.session-item { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.5); }
+.session-item:last-child { border-bottom: none; }
+
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">SUN<span>FOOD</span></div>
+    <div class="login-subtitle">Export Sales Team</div>
+    <div class="login-label">เลือกชื่อผู้ใช้</div>
+    <div class="user-grid">
+      <button class="user-btn" onclick="selectUser('NICHA')">NICHA</button>
+      <button class="user-btn" onclick="selectUser('NET')">NET</button>
+      <button class="user-btn" onclick="selectUser('KAN')">KAN</button>
+      <button class="user-btn" onclick="selectUser('EMMA')">EMMA</button>
+    </div>
+    <div class="login-footer">SUNFOOD INTERNATIONAL · INQUIRY FORM</div>
+  </div>
+</div>
+
+<div class="user-tag" id="user-tag"></div>
+
+<header class="site-header">
+  <div class="logo-text">SUN<span>FOOD</span></div>
+  <div class="header-tag">INQUIRY FROM CUSTOMER</div>
+</header>
+
+<div class="hero">
+  <div class="hero-tag">&#127828; EXPORT SALES TEAM</div>
+  <h1>ปรึกษาเสนอราคา</h1>
+</div>
+
+<!-- TAB BAR -->
+<div class="wizard-wrap">
+  <div class="tab-bar">
+    <div class="tab-item active" id="ti-1">
+      <div class="tab-bubble" id="tb-1">1</div>
+      <div class="tab-info"><div class="tab-num">Step 1</div><div class="tab-name">Customer</div></div>
+    </div>
+    <div class="tab-item locked" id="ti-2">
+      <div class="tab-bubble" id="tb-2">2</div>
+      <div class="tab-info"><div class="tab-num">Step 2</div><div class="tab-name">Inquiry</div></div>
+    </div>
+    <div class="tab-item locked" id="ti-3">
+      <div class="tab-bubble" id="tb-3">3</div>
+      <div class="tab-info"><div class="tab-num">Step 3</div><div class="tab-name">รายละเอียด</div></div>
+    </div>
+    <div class="tab-item locked" id="ti-4">
+      <div class="tab-bubble" id="tb-4">4</div>
+      <div class="tab-info"><div class="tab-num">Step 4</div><div class="tab-name">มองเสนอราคา</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="form-wrap">
+
+  <!-- ── TAB 1: CUSTOMER ── -->
+  <div class="tab-panel active" id="tp-1">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon">🏢</div>
+        <div>
+          <div class="card-title">Customer</div>
+          <div class="card-sub">Company Information</div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>ชื่อบริษัท / Company Name <span class="req">*</span></label>
+        <input id="c-company" type="text" placeholder="">
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>ท่าเรือปลายทาง / Destination Port <span class="req">*</span></label>
+        <input id="c-port" type="text" placeholder="เช่น Busan, South Korea / Shimizu, Japan">
+      </div>
+      <div class="g3">
+        <div class="field">
+          <label>Incoterm</label>
+          <select id="t-incoterm">
+            <option>CFR</option><option>CIF</option><option>FOB</option><option>EXW</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Payment Term</label>
+          <select id="t-payment">
+            <option>LC at Sight</option><option>LC 30 days</option><option>LC 60 days</option>
+            <option>TT in Advance</option><option>TT 30 days</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>ประเภทออเดอร์</label>
+          <select id="t-order-type">
+            <option>ออเดอร์ต่อเนื่อง</option><option>ออเดอร์ครั้งเดียว</option><option>ทดลองสั่ง</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="nav-row">
+      <button class="btn-next" onclick="goNext(1)">ถัดไป: Inquiry →</button>
+    </div>
+  </div>
+
+  <!-- ── TAB 2: INQUIRY ── -->
+  <div class="tab-panel" id="tp-2">
+    <div class="session-bar" id="session-bar">
+      <div>
+        <strong id="session-count">0 สินค้าที่บันทึกแล้ว</strong>
+        <div class="session-list" id="session-list"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon">🍗</div>
+        <div>
+          <div class="card-title">Inquiry</div>
+          <div class="card-sub">สินค้าที่ต้องการ — เพิ่มได้หลายรายการ</div>
+        </div>
+      </div>
+      <div id="products-container"></div>
+    </div>
+    <div class="nav-row">
+      <button class="btn-back" onclick="goBack(2)">← กลับ</button>
+      <button class="btn-next" onclick="goNext(2)">ถัดไป: รายละเอียด →</button>
+    </div>
+  </div>
+
+  <!-- ── TAB 3: รายละเอียด ── -->
+  <div class="tab-panel" id="tp-3">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon">📋</div>
+        <div>
+          <div class="card-title">รายละเอียด</div>
+          <div class="card-sub">ข้อมูลเพิ่มเติมสำหรับทีมขาย</div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>ได้จัดสรรมาเท่าไหร่ (จัดสรรเนื้อ)</label>
+        <textarea id="d-allocation" placeholder="เช่น FL = 150 MT/month, จัดสรร 2-4 FCL/month"></textarea>
+      </div>
+      <div class="g2" style="margin-bottom:14px">
+        <div class="field">
+          <label>ราคาปิดการขายล่าสุด</label>
+          <input id="d-last-closed" type="text" placeholder="เช่น $3,550 (27/03)">
+        </div>
+        <div class="field">
+          <label>ราคาเสนอล่าสุด</label>
+          <input id="d-last-offer" type="text" placeholder="เช่น $3,625/MT">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>ค่าเงิน</label>
+        <input id="d-currency" type="text" placeholder="เช่น JPY 157.62 / THB 32.33">
+      </div>
+      <div class="field">
+        <label>อื่นๆ</label>
+        <textarea id="d-other" placeholder="ข้อมูลเพิ่มเติม หรือหมายเหตุ..."></textarea>
+      </div>
+    </div>
+    <div class="nav-row">
+      <button class="btn-back" onclick="goBack(3)">← กลับ</button>
+      <button class="btn-next" onclick="goNext(3)">ถัดไป: มองเสนอราคา →</button>
+    </div>
+  </div>
+
+  <!-- ── TAB 4: มองเสนอราคา ── -->
+  <div class="tab-panel" id="tp-4">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon">💰</div>
+        <div>
+          <div class="card-title">มองเสนอราคา</div>
+          <div class="card-sub">Offer Consideration</div>
+        </div>
+      </div>
+      <div class="g3" style="margin-bottom:14px">
+        <div class="field">
+          <label>Shipment ที่จะเสนอ <span class="req">*</span></label>
+          <input id="t-period" type="text" placeholder="เช่น Oct/Nov 2026 — 4 FCL">
+        </div>
+        <div class="field">
+          <label>ราคาเสนอ (USD/MT)</label>
+          <input id="t-idea-price" type="text" placeholder="เช่น $3,625">
+        </div>
+        <div class="field">
+          <label>%Margin</label>
+          <input id="t-margin" type="text" placeholder="เช่น 48.6%">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Quantity per Month (MT)</label>
+        <input id="t-qty-month" type="text" placeholder="เช่น 96 MT / 4 FCL">
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <label>หมายเหตุ / Additional Requirements</label>
+        <textarea id="t-remark" placeholder="เช่น ต้องการ Herb Fed, ขนาดพิเศษ, เงื่อนไขพิเศษ..."></textarea>
+      </div>
+    </div>
+    <div class="nav-row">
+      <button class="btn-back" onclick="goBack(4)">← กลับ</button>
+      <button class="btn-add-more" onclick="addMoreProduct()">+ เพิ่มสินค้า</button>
+      <button class="btn-submit-final" onclick="submitForm()">&#128232; ส่งใบเสนอราคา</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- SUCCESS -->
+<div class="success-overlay" id="success-overlay">
+  <div class="success-icon">&#10003;</div>
+  <div class="success-title">ส่งคำขอสำเร็จแล้ว!</div>
+  <div class="success-sub">ทีมขาย SunFood ได้รับข้อมูลของท่านแล้วค่ะ</div>
+  <div class="success-ref" id="ref-number">REF: —</div>
+  <div class="success-note">ขอบคุณที่ไว้วางใจ SunFood International ค่ะ</div>
+  <button class="btn-new" onclick="resetForm()">+ กรอกใหม่</button>
+</div>
+
+<script>
+var prodCount = 0;
+var currentTab = 1;
+var completedTabs = {};
+var savedSessions = []; // เก็บข้อมูลแต่ละรอบของสินค้า
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzaehsSKJH0LDdsPpZjmDOfZAfcllgcZL1LUlgORAOMzX0KlkkWAgHwBbIEcaVIkEQ/exec';
+
+/* ── TAB NAVIGATION ── */
+function showTab(n) {
+  for (var i = 1; i <= 4; i++) {
+    var panel = document.getElementById('tp-' + i);
+    var ti = document.getElementById('ti-' + i);
+    var tb = document.getElementById('tb-' + i);
+    panel.classList.toggle('active', i === n);
+    ti.classList.remove('active', 'done', 'locked');
+    if (i === n) {
+      ti.classList.add('active');
+      tb.textContent = i;
+    } else if (completedTabs[i]) {
+      ti.classList.add('done');
+      tb.textContent = '✓';
+    } else {
+      ti.classList.add('locked');
+      tb.textContent = i;
+    }
+  }
+  currentTab = n;
+  window.scrollTo(0, 0);
+}
+
+function goNext(from) {
+  if (from === 1) {
+    if (!document.getElementById('c-company').value.trim() || !document.getElementById('c-port').value.trim()) {
+      alert('กรุณากรอก Company Name และ Destination Port ก่อนค่ะ');
+      return;
+    }
+  }
+  if (from === 2) {
+    if (document.querySelectorAll('.prod-block').length === 0) {
+      alert('กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการค่ะ');
+      return;
+    }
+  }
+  if (from === 4) {
+    if (!document.getElementById('t-period').value.trim()) {
+      alert('กรุณากรอก Shipment ที่จะเสนอค่ะ');
+      return;
+    }
+  }
+  completedTabs[from] = true;
+  showTab(from + 1);
+}
+
+function goBack(from) {
+  showTab(from - 1);
+}
+
+/* ── PRODUCTS ── */
+function addProduct(data) {
+  prodCount++;
+  var id = prodCount;
+  data = data || {};
+  var div = document.createElement('div');
+  div.className = 'prod-block';
+  div.id = 'pb-' + id;
+  div.innerHTML =
+    '<div class="prod-header">' +
+      '<span class="prod-label"><span class="prod-dot"></span>รายการที่ ' + id + '</span>' +
+      '<button class="btn-rm" onclick="removeProduct(' + id + ')" title="ลบ">&#215;</button>' +
+    '</div>' +
+    '<div class="g2" style="margin-bottom:10px">' +
+      '<div class="field"><label>ประเภทสินค้า / Product <span class="req">*</span></label>' +
+        '<input class="pp-type" type="text" placeholder="" value="' + (data.type||'') + '"></div>' +
+      '<div class="field"><label>Code</label>' +
+        '<input class="pp-code" type="text" placeholder="" value="' + (data.code||'') + '"></div>' +
+    '</div>' +
+    '<div class="g2" style="margin-bottom:10px">' +
+      '<div class="field"><label>Quantity Request (FCL/MT)</label>' +
+        '<input class="pp-qty" type="text" placeholder="" value="' + (data.qty||'') + '"></div>' +
+      '<div class="field"><label>Shipment Request</label>' +
+        '<input class="pp-months" type="text" placeholder="" value="' + (data.months||'') + '"></div>' +
+    '</div>' +
+    '<div class="g2">' +
+      '<div class="field"><label>Idea Price (USD/MT or THB/KG)</label>' +
+        '<input class="pp-idea" type="text" placeholder="" value="' + (data.idea||'') + '"></div>' +
+      '<div class="field"><label>%Margin</label>' +
+        '<input class="pp-margin" type="text" placeholder="" value="' + (data.margin||'') + '"></div>' +
+    '</div>';
+  document.getElementById('products-container').appendChild(div);
+}
+
+function removeProduct(id) {
+  var el = document.getElementById('pb-' + id);
+  if (el) el.remove();
+}
+
+function getProdData() {
+  var out = [];
+  document.querySelectorAll('.prod-block').forEach(function(b) {
+    out.push({
+      type:   (b.querySelector('.pp-type')   || {}).value || '',
+      code:   (b.querySelector('.pp-code')   || {}).value || '',
+      qty:    (b.querySelector('.pp-qty')    || {}).value || '',
+      months: (b.querySelector('.pp-months') || {}).value || '',
+      idea:   (b.querySelector('.pp-idea')   || {}).value || '',
+      margin: (b.querySelector('.pp-margin') || {}).value || ''
+    });
+  });
+  return out;
+}
+
+/* ── ADD MORE PRODUCT ── */
+function addMoreProduct() {
+  // บันทึก offer/detail รอบนี้
+  var g = function(id) { return document.getElementById(id) ? document.getElementById(id).value.trim() : ''; };
+  var session = {
+    sessionNum: savedSessions.length + 1,
+    products: getProdData(),
+    period: g('t-period'),
+    offerPrice: g('t-idea-price'),
+    offerMargin: g('t-margin'),
+    qtyPerMonth: g('t-qty-month'),
+    remark: g('t-remark')
+  };
+  savedSessions.push(session);
+
+  // รีเซ็ต tab 2 (inquiry) และ tab 4 (offer)
+  document.getElementById('products-container').innerHTML = '';
+  prodCount = 0;
+  addProduct();
+  document.getElementById('t-period').value = '';
+  document.getElementById('t-idea-price').value = '';
+  document.getElementById('t-margin').value = '';
+  document.getElementById('t-qty-month').value = '';
+  document.getElementById('t-remark').value = '';
+
+  // อัปเดต session bar
+  updateSessionBar();
+
+  // วนกลับ tab 2
+  completedTabs[2] = false;
+  completedTabs[3] = false;
+  completedTabs[4] = false;
+  showTab(2);
+}
+
+function updateSessionBar() {
+  var bar = document.getElementById('session-bar');
+  var countEl = document.getElementById('session-count');
+  var listEl = document.getElementById('session-list');
+  if (!savedSessions.length) { bar.classList.remove('show'); return; }
+  bar.classList.add('show');
+  countEl.textContent = '✓ บันทึกแล้ว ' + savedSessions.length + ' ชุด';
+  listEl.innerHTML = savedSessions.map(function(s) {
+    var prods = s.products.map(function(p){ return p.type || '—'; }).join(', ');
+    return '<div class="session-item">ชุดที่ ' + s.sessionNum + ': ' + prods + (s.period ? '  ·  ' + s.period : '') + '</div>';
+  }).join('');
+}
+
+/* ── SUBMIT ── */
+function submitForm() {
+  var g = function(id) { return document.getElementById(id).value.trim(); };
+  if (!g('t-period')) { alert('กรุณากรอก Shipment ที่จะเสนอค่ะ'); return; }
+
+  var refNum = 'SFD-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*9000)+1000);
+  // รวมชุดสุดท้ายเข้า sessions
+  var lastSession = {
+    sessionNum: savedSessions.length + 1,
+    products: getProdData(),
+    period: g('t-period'), offerPrice: g('t-idea-price'),
+    offerMargin: g('t-margin'), qtyPerMonth: g('t-qty-month'), remark: g('t-remark')
+  };
+  var allSessions = savedSessions.concat([lastSession]);
+
+  var payload = {
+    ref: refNum, submittedAt: new Date().toISOString(), status: 'pending',
+    salesUser: window._currentUser || '',
+    company: g('c-company'), port: g('c-port'),
+    incoterm: document.getElementById('t-incoterm').value,
+    payment: document.getElementById('t-payment').value,
+    orderType: document.getElementById('t-order-type').value,
+    allocation: g('d-allocation'), lastClosed: g('d-last-closed'),
+    lastOffer: g('d-last-offer'), currency: g('d-currency'), otherDetail: g('d-other'),
+    sessions: allSessions,
+    // backward compat: flatten products from all sessions
+    products: allSessions.reduce(function(acc, s) {
+      return acc.concat((s.products || []).map(function(p) {
+        return { type: p.type||'', code: p.code||'', qty: p.qty||'', months: p.months||'', idea: p.idea||'', margin: p.margin||'', period: s.period||'', offerPrice: s.offerPrice||'', offerMargin: s.offerMargin||'' };
+      }));
+    }, [])
+  };
+
+  var existing = JSON.parse(localStorage.getItem('sf_requests') || '[]');
+  existing.unshift(payload);
+  localStorage.setItem('sf_requests', JSON.stringify(existing));
+
+  var btn = document.querySelector('.btn-submit-final');
+  btn.textContent = 'กำลังส่ง...'; btn.disabled = true;
+
+  completedTabs[4] = true;
+
+  if (APPS_SCRIPT_URL) {
+    var img = new Image();
+    img.src = APPS_SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify(payload));
+    img.onload = function() { showSuccess(refNum); };
+    img.onerror = function() { showSuccess(refNum); };
+    setTimeout(function() { showSuccess(refNum); }, 2000);
+  } else {
+    showSuccess(refNum);
+  }
+}
+
+function showSuccess(refNum) {
+  document.getElementById('ref-number').textContent = 'REF: ' + refNum;
+  document.getElementById('success-overlay').classList.add('show');
+}
+
+function resetForm() {
+  document.getElementById('success-overlay').classList.remove('show');
+  document.getElementById('c-company').value = '';
+  document.getElementById('c-port').value = '';
+  document.getElementById('d-allocation').value = '';
+  document.getElementById('d-last-closed').value = '';
+  document.getElementById('d-last-offer').value = '';
+  document.getElementById('d-currency').value = '';
+  document.getElementById('d-other').value = '';
+  document.getElementById('t-period').value = '';
+  document.getElementById('t-idea-price').value = '';
+  document.getElementById('t-margin').value = '';
+  document.getElementById('t-qty-month').value = '';
+  document.getElementById('t-remark').value = '';
+  document.getElementById('products-container').innerHTML = '';
+  prodCount = 0; completedTabs = {}; savedSessions = []; updateSessionBar();
+  addProduct();
+  var btn = document.querySelector('.btn-submit-final');
+  if (btn) { btn.textContent = '📨 ส่งคำขอใบเสนอราคา'; btn.disabled = false; }
+  showTab(1);
+}
+
+/* ── LOGIN ── */
+function selectUser(name) {
+  document.getElementById('login-overlay').style.display = 'none';
+  var tag = document.getElementById('user-tag');
+  tag.textContent = name; tag.style.display = 'block';
+  window._currentUser = name;
+}
+
+addProduct();
+</script>
+</body>
+</html>
