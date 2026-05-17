@@ -591,6 +591,7 @@ input[type="number"]::-webkit-inner-spin-button { display: none; }
     </div>
     <div class="nav-row">
       <button class="btn-back" data-action="back" data-from="4">← กลับ</button>
+      <button class="btn-add-more" data-action="addmore">+ เพิ่มสินค้า</button>
       <button class="btn-submit-final" data-action="submit">&#128232; ส่งคำขอใบเสนอราคา</button>
     </div>
   </div>
@@ -745,15 +746,20 @@ function getProdData() {
 
 /* ── ADD MORE PRODUCT ── */
 function addMoreProduct() {
-  // บันทึก products รอบนี้พร้อมข้อมูล offer ที่ฝังในแต่ละ block
-  var session = {
-    sessionNum: savedSessions.length + 1,
-    products: getProdData(),
-    remark: document.getElementById('t-remark') ? document.getElementById('t-remark').value.trim() : ''
-  };
-  savedSessions.push(session);
+  // บันทึก products รอบปัจจุบัน (ที่กรอกใน Step 2 อยู่)
+  var currentProds = getProdData();
+  if (currentProds.length === 0 || !currentProds[0].type) {
+    // ถ้ายังไม่มีสินค้ากรอก ไม่ต้อง save session ว่าง
+  } else {
+    var session = {
+      sessionNum: savedSessions.length + 1,
+      products: currentProds,
+      remark: ''
+    };
+    savedSessions.push(session);
+  }
 
-  // รีเซ็ต products container
+  // รีเซ็ต products container สำหรับชุดใหม่
   document.getElementById('products-container').innerHTML = '';
   prodCount = 0;
   addProduct();
@@ -761,7 +767,7 @@ function addMoreProduct() {
   // อัปเดต session bar
   updateSessionBar();
 
-  // วนกลับ tab 2
+  // วนกลับ Step 2
   completedTabs[2] = false;
   completedTabs[3] = false;
   completedTabs[4] = false;
@@ -777,7 +783,8 @@ function updateSessionBar() {
   countEl.textContent = '✓ บันทึกแล้ว ' + savedSessions.length + ' ชุด';
   listEl.innerHTML = savedSessions.map(function(s) {
     var prods = s.products.map(function(p){ return p.type || '—'; }).join(', ');
-    return '<div class="session-item">ชุดที่ ' + s.sessionNum + ': ' + prods + (s.period ? '  ·  ' + s.period : '') + '</div>';
+    var periods = s.products.map(function(p){ return p.period || ''; }).filter(Boolean).join(', ');
+    return '<div class="session-item">ชุดที่ ' + s.sessionNum + ': ' + prods + (periods ? '  ·  ' + periods : '') + '</div>';
   }).join('');
 }
 
