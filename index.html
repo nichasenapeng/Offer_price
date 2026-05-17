@@ -202,6 +202,40 @@ input[type="number"]::-webkit-inner-spin-button { display: none; }
 .btn-rm:hover { background: var(--red-light); border-color: rgba(192,57,43,0.4); color: var(--red); }
 .btn-add { display: none !important; }
 
+/* ── PRODUCT SECTION LABELS ── */
+.prod-section-label {
+  font-size: 11px; font-weight: 600; color: var(--ink-muted);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 10px; margin-top: 2px;
+}
+.prod-offer-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(236,72,153,0.25), transparent);
+  margin: 14px 0 12px;
+}
+
+/* ── SUMMARY (Tab 4) ── */
+.summary-item {
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.35);
+  backdrop-filter: blur(8px);
+}
+.summary-item-head {
+  font-size: 13px; margin-bottom: 8px; color: var(--ink);
+}
+.summary-code { color: var(--ink-muted); font-size: 12px; }
+.summary-grid {
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  font-size: 12px; color: var(--ink-soft);
+}
+.summary-grid .summary-offer {
+  color: var(--orange-mid); font-weight: 500;
+}
+
+
 /* ── NAV BUTTONS ── */
 .nav-row { display: flex; gap: 10px; margin-top: 6px; }
 .btn-back {
@@ -419,7 +453,7 @@ input[type="number"]::-webkit-inner-spin-button { display: none; }
     </div>
     <div class="tab-item locked" id="ti-4">
       <div class="tab-bubble" id="tb-4">4</div>
-      <div class="tab-info"><div class="tab-num">Step 4</div><div class="tab-name">มองเสนอราคา</div></div>
+      <div class="tab-info"><div class="tab-num">Step 4</div><div class="tab-name">สรุป & ส่ง</div></div>
     </div>
   </div>
 </div>
@@ -491,6 +525,7 @@ input[type="number"]::-webkit-inner-spin-button { display: none; }
     </div>
     <div class="nav-row">
       <button class="btn-back" onclick="goBack(2)">← กลับ</button>
+      <button class="btn-add-more" onclick="addMoreProduct()">+ บันทึก & เพิ่มชุดใหม่</button>
       <button class="btn-next" onclick="goNext(2)">ถัดไป: รายละเอียด →</button>
     </div>
   </div>
@@ -534,44 +569,26 @@ input[type="number"]::-webkit-inner-spin-button { display: none; }
     </div>
   </div>
 
-  <!-- ── TAB 4: มองเสนอราคา ── -->
+  <!-- ── TAB 4: สรุป & ส่ง ── -->
   <div class="tab-panel" id="tp-4">
     <div class="card">
       <div class="card-head">
-        <div class="card-icon">💰</div>
+        <div class="card-icon">📨</div>
         <div>
-          <div class="card-title">มองเสนอราคา</div>
-          <div class="card-sub">Offer Consideration</div>
+          <div class="card-title">สรุปคำขอ</div>
+          <div class="card-sub">ตรวจสอบข้อมูลก่อนส่ง</div>
         </div>
       </div>
-      <div class="g3" style="margin-bottom:14px">
-        <div class="field">
-          <label>Shipment ที่จะเสนอ <span class="req">*</span></label>
-          <input id="t-period" type="text" placeholder="เช่น Oct/Nov 2026 — 4 FCL">
-        </div>
-        <div class="field">
-          <label>ราคาเสนอ (USD/MT)</label>
-          <input id="t-idea-price" type="text" placeholder="เช่น $3,625">
-        </div>
-        <div class="field">
-          <label>%Margin</label>
-          <input id="t-margin" type="text" placeholder="เช่น 48.6%">
-        </div>
-      </div>
-      <div class="field" style="margin-bottom:14px">
-        <label>Quantity per Month (MT)</label>
-        <input id="t-qty-month" type="text" placeholder="เช่น 96 MT / 4 FCL">
-      </div>
+      <div id="summary-container" style="margin-bottom:14px"></div>
       <div class="divider"></div>
       <div class="field">
-        <label>หมายเหตุ / Additional Requirements</label>
+        <label>หมายเหตุรวม / Additional Requirements</label>
         <textarea id="t-remark" placeholder="เช่น ต้องการ Herb Fed, ขนาดพิเศษ, เงื่อนไขพิเศษ..."></textarea>
       </div>
     </div>
     <div class="nav-row">
       <button class="btn-back" onclick="goBack(4)">← กลับ</button>
-      <button class="btn-add-more" onclick="addMoreProduct()">+ เพิ่มสินค้า</button>
-      <button class="btn-submit-final" onclick="submitForm()">&#128232; ส่งใบเสนอราคา</button>
+      <button class="btn-submit-final" onclick="submitForm()">&#128232; ส่งคำขอใบเสนอราคา</button>
     </div>
   </div>
 
@@ -592,7 +609,7 @@ var prodCount = 0;
 var currentTab = 1;
 var completedTabs = {};
 var savedSessions = []; // เก็บข้อมูลแต่ละรอบของสินค้า
-var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyzy-WIRKKwC6siA1vExrEn0jKYjuajSdc5w10irbOMnsh7YRh7mO0tvF0h7cWdIabg/exec';
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAfBG-BNJfw7y7MnbC6t4zC4Vckewu-VGQBBgSnEhAXqHEYRyFxjmKuvoLZxpM-Lw/exec';
 
 /* ── TAB NAVIGATION ── */
 function showTab(n) {
@@ -629,15 +646,21 @@ function goNext(from) {
       alert('กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการค่ะ');
       return;
     }
-  }
-  if (from === 4) {
-    if (!document.getElementById('t-period').value.trim()) {
-      alert('กรุณากรอก Shipment ที่จะเสนอค่ะ');
+    // validate ว่าทุก product block กรอก Shipment ที่จะเสนอ
+    var missing = false;
+    document.querySelectorAll('.prod-block').forEach(function(b, idx) {
+      var periodEl = b.querySelector('.pp-period');
+      if (periodEl && !periodEl.value.trim()) missing = idx + 1;
+    });
+    if (missing) {
+      alert('กรุณากรอก "Shipment ที่จะเสนอ" ในรายการที่ ' + missing + ' ก่อนค่ะ');
       return;
     }
   }
   completedTabs[from] = true;
-  showTab(from + 1);
+  var next = from + 1;
+  if (next === 4) { renderSummary(); }
+  showTab(next);
 }
 
 function goBack(from) {
@@ -657,24 +680,39 @@ function addProduct(data) {
       '<span class="prod-label"><span class="prod-dot"></span>รายการที่ ' + id + '</span>' +
       '<button class="btn-rm" onclick="removeProduct(' + id + ')" title="ลบ">&#215;</button>' +
     '</div>' +
+    /* ── Inquiry fields ── */
+    '<div class="prod-section-label">📦 Inquiry</div>' +
     '<div class="g2" style="margin-bottom:10px">' +
       '<div class="field"><label>ประเภทสินค้า / Product <span class="req">*</span></label>' +
         '<input class="pp-type" type="text" placeholder="" value="' + (data.type||'') + '"></div>' +
       '<div class="field"><label>Code</label>' +
         '<input class="pp-code" type="text" placeholder="" value="' + (data.code||'') + '"></div>' +
     '</div>' +
-    '<div class="g2" style="margin-bottom:10px">' +
+    '<div class="g2" style="margin-bottom:14px">' +
       '<div class="field"><label>Quantity Request (FCL/MT)</label>' +
         '<input class="pp-qty" type="text" placeholder="" value="' + (data.qty||'') + '"></div>' +
       '<div class="field"><label>Shipment Request</label>' +
         '<input class="pp-months" type="text" placeholder="" value="' + (data.months||'') + '"></div>' +
     '</div>' +
-    '<div class="g2">' +
+    '<div class="g2" style="margin-bottom:14px">' +
       '<div class="field"><label>Idea Price (USD/MT or THB/KG)</label>' +
         '<input class="pp-idea" type="text" placeholder="" value="' + (data.idea||'') + '"></div>' +
-      '<div class="field"><label>%Margin</label>' +
+      '<div class="field"><label>%Margin (Idea)</label>' +
         '<input class="pp-margin" type="text" placeholder="" value="' + (data.margin||'') + '"></div>' +
-    '</div>';
+    '</div>' +
+    /* ── Offer fields ── */
+    '<div class="prod-offer-divider"></div>' +
+    '<div class="prod-section-label">💰 มองเสนอราคา</div>' +
+    '<div class="g3" style="margin-bottom:10px">' +
+      '<div class="field"><label>Shipment ที่จะเสนอ <span class="req">*</span></label>' +
+        '<input class="pp-period" type="text" placeholder="เช่น Oct/Nov 2026" value="' + (data.period||'') + '"></div>' +
+      '<div class="field"><label>ราคาเสนอ (USD/MT)</label>' +
+        '<input class="pp-offer-price" type="text" placeholder="เช่น $3,625" value="' + (data.offerPrice||'') + '"></div>' +
+      '<div class="field"><label>%Margin (Offer)</label>' +
+        '<input class="pp-offer-margin" type="text" placeholder="เช่น 48.6%" value="' + (data.offerMargin||'') + '"></div>' +
+    '</div>' +
+    '<div class="field" style="margin-bottom:10px"><label>Quantity per Month (MT)</label>' +
+      '<input class="pp-qty-month" type="text" placeholder="เช่น 96 MT / 4 FCL" value="' + (data.qtyMonth||'') + '"></div>';
   document.getElementById('products-container').appendChild(div);
 }
 
@@ -687,12 +725,16 @@ function getProdData() {
   var out = [];
   document.querySelectorAll('.prod-block').forEach(function(b) {
     out.push({
-      type:   (b.querySelector('.pp-type')   || {}).value || '',
-      code:   (b.querySelector('.pp-code')   || {}).value || '',
-      qty:    (b.querySelector('.pp-qty')    || {}).value || '',
-      months: (b.querySelector('.pp-months') || {}).value || '',
-      idea:   (b.querySelector('.pp-idea')   || {}).value || '',
-      margin: (b.querySelector('.pp-margin') || {}).value || ''
+      type:       (b.querySelector('.pp-type')        || {}).value || '',
+      code:       (b.querySelector('.pp-code')        || {}).value || '',
+      qty:        (b.querySelector('.pp-qty')         || {}).value || '',
+      months:     (b.querySelector('.pp-months')      || {}).value || '',
+      idea:       (b.querySelector('.pp-idea')        || {}).value || '',
+      margin:     (b.querySelector('.pp-margin')      || {}).value || '',
+      period:     (b.querySelector('.pp-period')      || {}).value || '',
+      offerPrice: (b.querySelector('.pp-offer-price') || {}).value || '',
+      offerMargin:(b.querySelector('.pp-offer-margin')|| {}).value || '',
+      qtyMonth:   (b.querySelector('.pp-qty-month')   || {}).value || ''
     });
   });
   return out;
@@ -700,28 +742,18 @@ function getProdData() {
 
 /* ── ADD MORE PRODUCT ── */
 function addMoreProduct() {
-  // บันทึก offer/detail รอบนี้
-  var g = function(id) { return document.getElementById(id) ? document.getElementById(id).value.trim() : ''; };
+  // บันทึก products รอบนี้พร้อมข้อมูล offer ที่ฝังในแต่ละ block
   var session = {
     sessionNum: savedSessions.length + 1,
     products: getProdData(),
-    period: g('t-period'),
-    offerPrice: g('t-idea-price'),
-    offerMargin: g('t-margin'),
-    qtyPerMonth: g('t-qty-month'),
-    remark: g('t-remark')
+    remark: document.getElementById('t-remark') ? document.getElementById('t-remark').value.trim() : ''
   };
   savedSessions.push(session);
 
-  // รีเซ็ต tab 2 (inquiry) และ tab 4 (offer)
+  // รีเซ็ต products container
   document.getElementById('products-container').innerHTML = '';
   prodCount = 0;
   addProduct();
-  document.getElementById('t-period').value = '';
-  document.getElementById('t-idea-price').value = '';
-  document.getElementById('t-margin').value = '';
-  document.getElementById('t-qty-month').value = '';
-  document.getElementById('t-remark').value = '';
 
   // อัปเดต session bar
   updateSessionBar();
@@ -748,16 +780,24 @@ function updateSessionBar() {
 
 /* ── SUBMIT ── */
 function submitForm() {
-  var g = function(id) { return document.getElementById(id).value.trim(); };
-  if (!g('t-period')) { alert('กรุณากรอก Shipment ที่จะเสนอค่ะ'); return; }
+  var g = function(id) { return document.getElementById(id) ? document.getElementById(id).value.trim() : ''; };
+
+  // validate: ทุก product block ต้องมี Shipment ที่จะเสนอ
+  var prods = getProdData();
+  for (var i = 0; i < prods.length; i++) {
+    if (!prods[i].period) {
+      alert('กรุณากรอก "Shipment ที่จะเสนอ" ให้ครบทุกรายการค่ะ (รายการที่ ' + (i+1) + ')');
+      return;
+    }
+  }
 
   var refNum = 'SFD-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*9000)+1000);
+
   // รวมชุดสุดท้ายเข้า sessions
   var lastSession = {
     sessionNum: savedSessions.length + 1,
-    products: getProdData(),
-    period: g('t-period'), offerPrice: g('t-idea-price'),
-    offerMargin: g('t-margin'), qtyPerMonth: g('t-qty-month'), remark: g('t-remark')
+    products: prods,
+    remark: g('t-remark')
   };
   var allSessions = savedSessions.concat([lastSession]);
 
@@ -771,10 +811,16 @@ function submitForm() {
     allocation: g('d-allocation'), lastClosed: g('d-last-closed'),
     lastOffer: g('d-last-offer'), currency: g('d-currency'), otherDetail: g('d-other'),
     sessions: allSessions,
-    // backward compat: flatten products from all sessions
+    // flatten: แต่ละ product มีข้อมูล offer ของตัวเอง
     products: allSessions.reduce(function(acc, s) {
       return acc.concat((s.products || []).map(function(p) {
-        return { type: p.type||'', code: p.code||'', qty: p.qty||'', months: p.months||'', idea: p.idea||'', margin: p.margin||'', period: s.period||'', offerPrice: s.offerPrice||'', offerMargin: s.offerMargin||'' };
+        return {
+          type: p.type||'', code: p.code||'', qty: p.qty||'', months: p.months||'',
+          idea: p.idea||'', margin: p.margin||'',
+          period: p.period||'', offerPrice: p.offerPrice||'',
+          offerMargin: p.offerMargin||'', qtyMonth: p.qtyMonth||'',
+          remark: s.remark||''
+        };
       }));
     }, [])
   };
@@ -813,11 +859,7 @@ function resetForm() {
   document.getElementById('d-last-offer').value = '';
   document.getElementById('d-currency').value = '';
   document.getElementById('d-other').value = '';
-  document.getElementById('t-period').value = '';
-  document.getElementById('t-idea-price').value = '';
-  document.getElementById('t-margin').value = '';
-  document.getElementById('t-qty-month').value = '';
-  document.getElementById('t-remark').value = '';
+  if (document.getElementById('t-remark')) document.getElementById('t-remark').value = '';
   document.getElementById('products-container').innerHTML = '';
   prodCount = 0; completedTabs = {}; savedSessions = []; updateSessionBar();
   addProduct();
@@ -834,7 +876,34 @@ function selectUser(name) {
   window._currentUser = name;
 }
 
+function renderSummary() {
+  var container = document.getElementById('summary-container');
+  if (!container) return;
+  var allProds = [];
+  savedSessions.forEach(function(s) {
+    (s.products || []).forEach(function(p) { allProds.push(p); });
+  });
+  getProdData().forEach(function(p) { allProds.push(p); });
+
+  if (!allProds.length) { container.innerHTML = '<div style="color:var(--ink-muted);font-size:13px">ยังไม่มีสินค้า</div>'; return; }
+  container.innerHTML = allProds.map(function(p, i) {
+    return '<div class="summary-item">' +
+      '<div class="summary-item-head">รายการที่ ' + (i+1) + ': <strong>' + (p.type||'—') + '</strong>' + (p.code ? ' <span class="summary-code">[' + p.code + ']</span>' : '') + '</div>' +
+      '<div class="summary-grid">' +
+        (p.qty       ? '<span>📦 Qty: '       + p.qty        + '</span>' : '') +
+        (p.months    ? '<span>🗓 Req: '        + p.months     + '</span>' : '') +
+        (p.idea      ? '<span>💡 Idea: '       + p.idea       + '</span>' : '') +
+        (p.margin    ? '<span>📊 Margin Idea: '+ p.margin     + '</span>' : '') +
+        (p.period    ? '<span class="summary-offer">🚢 Shipment: <strong>' + p.period     + '</strong></span>' : '') +
+        (p.offerPrice? '<span class="summary-offer">💰 Offer: <strong>'    + p.offerPrice + '</strong></span>' : '') +
+        (p.offerMargin?'<span class="summary-offer">📈 %Margin: '          + p.offerMargin+ '</span>' : '') +
+        (p.qtyMonth  ? '<span class="summary-offer">📦 Qty/Month: '        + p.qtyMonth   + '</span>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+/* ── INIT ── */
 addProduct();
-</script>
 </body>
 </html>
