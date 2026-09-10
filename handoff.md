@@ -139,11 +139,20 @@ superseded|เหตุผล
 
 **ทำเมื่อผู้ใช้สั่งเท่านั้น และต้องขึ้นทั้งสองที่**
 
-**GitHub** — repo คือ `nichasenapeng/Offer_price` แต่ `gh` ในเครื่อง active เป็น `aiengsunfood` ซึ่ง push ไม่ได้
+**ขั้นตอนต่างกันตามเครื่อง — เช็คก่อนว่ามี `gh` / `node` ไหม**
+
+**GitHub** — repo คือ `nichasenapeng/Offer_price`
+
+เครื่องที่มี `gh` และ active เป็น `aiengsunfood` (push ไม่ได้) ต้องสลับก่อน:
 ```bash
 gh auth switch -u nichasenapeng
 git -c credential.helper='!gh auth git-credential' push origin main
 gh auth switch -u aiengsunfood
+```
+เครื่องที่ไม่มี `gh` แต่มี credential ของ nichasenapeng ใน macOS keychain
+(`credential.helper = osxkeychain`) push ตรงได้เลย ไม่ต้องสลับอะไร:
+```bash
+git push origin main
 ```
 
 **Cloudflare** — worker `sunfood-offer` อยู่บนบัญชีของ nicha (`186b05df927d0192ed92ec799dc1b2a0`)
@@ -159,6 +168,14 @@ CLOUDFLARE_ACCOUNT_ID=186b05df927d0192ed92ec799dc1b2a0 npx wrangler deploy
 ```
 token หมดอายุบ่อย และเวลา refresh เองมันเด้งกลับไปเป็นบัญชี ai.eng.sunfood ซึ่งเข้า worker ของ nicha ไม่ได้
 ต้อง `npx wrangler login` ใหม่ แล้วให้ผู้ใช้กด Allow **ภายใน 2 นาที** โดยเบราว์เซอร์ต้อง sign in เป็น nicha อยู่ก่อน
+เช็คว่าได้บัญชีถูกด้วย `npx wrangler whoami` — ต้องขึ้น account ID `186b05df...`
+
+**อย่ารัน `wrangler login` โดยไพป์ผ่าน `tail` หรือ `head`** — มันจะ buffer จนจบ process
+ทำให้ลิงก์ authorize ไม่โผล่ระหว่างที่ยังกดทัน
+
+เครื่องที่ไม่มี Node เลย (ไม่มี `node` / `npx` / Homebrew) ต้องให้ผู้ใช้ลง Node LTS
+จาก nodejs.org ก่อน เพราะขั้นตอนนี้ต้องใช้รหัสเครื่อง ทำแทนไม่ได้
+บนเครื่องแบบนั้น token จะไปอยู่ที่ `~/Library/Preferences/.wrangler/config/default.toml`
 
 เสร็จแล้วเทียบ md5 ของทั้งสอง URL กับไฟล์ในเครื่องก่อนบอกว่าเสร็จ
 
