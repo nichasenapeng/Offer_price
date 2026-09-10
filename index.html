@@ -210,6 +210,44 @@ input[type="number"]::-webkit-inner-spin-button { display: none; }
   margin: 14px 0 12px;
 }
 
+/* ── เลือกโหมดทั้งใบ: เสนอราคา / ให้ไอเดียราคา ── */
+.kind-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 14px; padding: 12px 14px;
+  border: 1px solid var(--glass-border); border-radius: var(--radius-sm);
+  background: var(--glass);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.kind-bar-label {
+  font-size: 11px; font-weight: 600; color: var(--ink-muted);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.kind-seg { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(166,61,95,0.06); }
+.kind-opt {
+  font-family: "Kanit", sans-serif; font-size: 13px; font-weight: 500;
+  padding: 7px 18px; border: 1px solid transparent; border-radius: 999px;
+  background: transparent; color: var(--ink-soft); cursor: pointer;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.kind-opt:hover { color: var(--orange-mid); }
+.kind-opt:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.kind-opt[aria-pressed="true"] {
+  background: linear-gradient(135deg, var(--orange), var(--orange-mid));
+  color: #fff; box-shadow: 0 2px 8px rgba(166,61,95,0.28);
+}
+.kind-hint { font-size: 12px; color: var(--ink-muted); flex: 1 1 220px; }
+
+/* โหมดไอเดียราคา: ซ่อนช่องที่ผูกกับการยืนราคา */
+#products-container .lbl-idea { display: none; }
+#products-container.kind-idea .lbl-offer { display: none; }
+#products-container.kind-idea .lbl-idea { display: inline; }
+#products-container.kind-idea .fld-offer-only { display: none; }
+#products-container.kind-idea .req-offer { display: none; }
+@media (prefers-reduced-motion: reduce) { .kind-opt { transition: none; } }
+
+/* ป้ายบอกว่าใบนี้เป็นไอเดียราคา (ฝั่งผู้อนุมัติ / เช็คสถานะ) */
+.tag-kind { background:#fffbeb; color:#92400e; border:1px solid #fcd34d; }
+
 /* ── SUMMARY (Tab 4) ── */
 .summary-item {
   border: 1px solid rgba(255,255,255,0.6);
@@ -682,6 +720,10 @@ body::before, body::after { display: none !important; }
 }
 .vote-result.approved{background:var(--green-light);color:var(--green);border:1px solid #a7f3d0}
 .vote-result.rejected{background:var(--red-light);color:var(--red);border:1px solid #fca5a5}
+/* "ไม่เสนอ" — ไม่ใช่ผลแพ้ ใช้โทนกลางให้แยกจาก "ไม่ปิดการขาย" ได้ทันที */
+.btn-notoffer{background:#eef2f7;color:#475569;border:1.5px solid #cbd5e1}
+.btn-notoffer:hover{background:#475569;color:#fff;transform:translateY(-1px);box-shadow:0 4px 14px rgba(71,85,105,.28)}
+.vote-result.notoffer{background:#eef2f7;color:#475569;border:1px solid #cbd5e1}
 .btn-undo{
   font-size:11px;font-weight:500;color:var(--ink-muted);
   background:rgba(0,0,0,.06);border:1px solid var(--border);
@@ -782,6 +824,7 @@ body::before, body::after { display: none !important; }
 
 #offer-app .header-tag{margin-left:16px}
 .badge-lost{background:rgba(243,244,246,0.9);color:#6b7280;border:1px solid #d1d5db}
+.badge-notoffer{background:#eef2f7;color:#475569;border:1px solid #cbd5e1}
 #approve-app .close-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 #approve-app .close-field label{display:block;font-size:10px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
 #approve-app .close-input{width:100%;padding:9px 14px;background:rgba(255,255,255,0.9);border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:"Kanit",sans-serif;font-size:14px;font-weight:600;color:var(--ink);transition:border-color .2s,box-shadow .2s}
@@ -815,7 +858,10 @@ body::before, body::after { display: none !important; }
 #approve-app .close-remark-wrap{margin-top:12px}
 #approve-app .close-remark{width:100%;font-weight:400;font-size:13px;font-family:"Sarabun",sans-serif;resize:vertical;line-height:1.5}
 #approve-app .close-remark-note{margin-top:10px;font-size:13px;color:var(--ink-soft);background:rgba(255,255,255,0.6);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:8px 12px}
+#approve-app .close-grid.ext-grid{grid-template-columns:1fr 2fr}
 @media(max-width:768px){#approve-app .close-grid{grid-template-columns:1fr 1fr}}
+/* จอแคบ: ช่องขอขยาย VALID ต้องเต็มความกว้าง ไม่งั้นพิมพ์รายละเอียดไม่ได้จริง */
+@media(max-width:560px){#approve-app .close-grid,#approve-app .close-grid.ext-grid{grid-template-columns:1fr}}
 /* skeleton loader */
 @keyframes skShimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}
 #approve-app .sk,#approve-app .summary-bar.loading .stat-value{
@@ -854,6 +900,11 @@ body::before, body::after { display: none !important; }
 #approve-app .ext-note.ok{background:rgba(230,247,240,0.85);border:1px solid #a7f3d0;color:var(--green)}
 #approve-app .ext-note.no{background:rgba(246,235,239,0.85);border:1px solid var(--red);color:var(--red-dark)}
 #approve-app .ext-reason{margin-top:5px;font-size:12px;opacity:.85}
+#approve-app .ext-reason{white-space:pre-wrap}
+#approve-app .ext-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+#approve-app .ext-actions .btn-undo{font-size:12px;padding:5px 12px}
+#approve-app .ext-form textarea.close-input{min-height:56px;resize:vertical}
+#approve-app .ext-decide textarea.close-input{min-height:56px;resize:vertical;width:100%}
 #approve-app .ext-decide{flex:1 0 100%;width:100%;margin-bottom:16px;padding:14px 18px;background:rgba(254,249,231,0.7);border:1.5px solid #d99a2b;border-radius:var(--radius-sm)}
 #approve-app .ext-compare{font-size:14px;color:var(--ink);margin-top:4px}
 #approve-app .ext-compare b{font-family:"Kanit",sans-serif;color:var(--red-dark)}
@@ -1188,6 +1239,16 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
           <div class="card-sub">สินค้าที่ต้องการ — เพิ่มได้หลายรายการ</div>
         </div>
       </div>
+      <div class="kind-bar">
+        <span class="kind-bar-label">ใบนี้คือ</span>
+        <div class="kind-seg" role="group" aria-label="เลือกว่าใบนี้เป็นการเสนอราคา หรือให้ไอเดียราคา">
+          <button type="button" class="kind-opt" id="kind-offer" aria-pressed="true"
+            onclick="setOfferKind('offer')">เสนอราคา</button>
+          <button type="button" class="kind-opt" id="kind-idea" aria-pressed="false"
+            onclick="setOfferKind('idea')">ให้ไอเดียราคา</button>
+        </div>
+        <span class="kind-hint" id="kind-hint">ราคาที่ยืนกับลูกค้าจริง — ต้องระบุ Shipment, DATE และ VALID</span>
+      </div>
       <div id="products-container"></div>
     </div>
     <div class="nav-row">
@@ -1297,7 +1358,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
     <div class="ap-login-logo">SUN<span>FOOD</span></div>
     <div class="login-sub">Offer Approval System</div>
 
-    <div class="ap-login-hint">กด Enter หรือปุ่มด้านล่างเพื่อเข้าสู่ระบบ</div>
+    <div class="ap-login-hint">กรอกรหัสผ่านเพื่อเข้าสู่ระบบ</div>
+    <div class="pw-wrap">
+      <input class="pw-input" id="pw" type="password" placeholder="รหัสผ่าน" maxlength="30"
+        autocomplete="current-password" aria-label="รหัสผ่านผู้อนุมัติ"
+        aria-describedby="pw-err" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="pw-err" id="pw-err" role="alert">รหัสผ่านไม่ถูกต้อง</div>
     <button class="btn-login" id="ap-enter" onclick="doLogin()">เข้าสู่ระบบ →</button>
     <div class="ap-login-footer">SUNFOOD INTERNATIONAL · OFFER APPROVAL DASHBOARD</div>
   </div>
@@ -1336,6 +1403,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
   <button class="filter-btn" id="filter-rejected" onclick="setFilter('rejected',this)">ปฏิเสธ</button>
   <button class="filter-btn" id="filter-closed-won" onclick="setFilter('closed-won',this)">ปิดการขายได้</button>
   <button class="filter-btn" id="filter-closed-lost" onclick="setFilter('closed-lost',this)">ไม่ปิดการขาย</button>
+  <button class="filter-btn" id="filter-not-offered" onclick="setFilter('not-offered',this)">ไม่เสนอ</button>
   <button class="filter-btn" id="filter-superseded" onclick="setFilter('superseded',this)">bidding</button>
   <button class="filter-btn" id="filter-question" onclick="setFilter('question',this)">มีคำถาม</button>
   <button class="filter-btn" id="filter-ext" onclick="setFilter('ext-pending',this)">ขอขยาย VALID</button>
@@ -1478,14 +1546,16 @@ function goNext(from) {
       alert('กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการค่ะ');
       return;
     }
-    var missing = false;
-    document.querySelectorAll('.prod-block').forEach(function(b, idx) {
-      var periodEl = b.querySelector('.pp-period');
-      if (periodEl && !periodEl.value.trim()) missing = idx + 1;
-    });
-    if (missing) {
-      alert('กรุณากรอก "Shipment ที่จะเสนอ" ในรายการที่ ' + missing + ' ก่อนค่ะ');
-      return;
+    if (offerKind !== 'idea') {
+      var missing = false;
+      document.querySelectorAll('.prod-block').forEach(function(b, idx) {
+        var periodEl = b.querySelector('.pp-period');
+        if (periodEl && !periodEl.value.trim()) missing = idx + 1;
+      });
+      if (missing) {
+        alert('กรุณากรอก "Shipment ที่จะเสนอ" ในรายการที่ ' + missing + ' ก่อนค่ะ');
+        return;
+      }
     }
   }
   completedTabs[from] = true;
@@ -1496,6 +1566,24 @@ function goNext(from) {
 
 function goBack(from) {
   showTab(from - 1);
+}
+
+/* ── โหมดทั้งใบ: 'offer' = ราคาที่ยืนกับลูกค้า · 'idea' = ให้ไอเดียราคา ── */
+var offerKind = 'offer';
+var KIND_HINT = {
+  offer: 'ราคาที่ยืนกับลูกค้าจริง — ต้องระบุ Shipment, DATE และ VALID',
+  idea:  'ราคาคร่าว ๆ ให้ลูกค้าดู — ยังไม่ยืนราคา จึงไม่ต้องมี DATE และ VALID'
+};
+function setOfferKind(kind) {
+  offerKind = (kind === 'idea') ? 'idea' : 'offer';
+  var box = document.getElementById('products-container');
+  if (box) box.classList.toggle('kind-idea', offerKind === 'idea');
+  var bo = document.getElementById('kind-offer');
+  var bi = document.getElementById('kind-idea');
+  if (bo) bo.setAttribute('aria-pressed', offerKind === 'offer' ? 'true' : 'false');
+  if (bi) bi.setAttribute('aria-pressed', offerKind === 'idea'  ? 'true' : 'false');
+  var hint = document.getElementById('kind-hint');
+  if (hint) hint.textContent = KIND_HINT[offerKind];
 }
 
 /* ── PRODUCTS ── */
@@ -1543,11 +1631,14 @@ function addProduct(data) {
 
     /* ── Offer ── */
     '<div class="prod-offer-divider"></div>' +
-    '<div class="prod-section-label">มองเสนอราคา</div>' +
+    '<div class="prod-section-label">' +
+      '<span class="lbl-offer">มองเสนอราคา</span>' +
+      '<span class="lbl-idea">ให้ไอเดียราคา</span></div>' +
     '<div class="g3" style="margin-bottom:10px">' +
-      '<div class="field"><label>Shipment ที่จะเสนอ <span class="req">*</span></label>' +
+      '<div class="field"><label>Shipment ที่จะเสนอ <span class="req req-offer">*</span></label>' +
         '<input class="pp-period" type="text" placeholder="เช่น Oct/Nov 2026" value="' + (data.period||'') + '"></div>' +
-      '<div class="field"><label>ราคาเสนอ (USD/MT)</label>' +
+      '<div class="field"><label><span class="lbl-offer">ราคาเสนอ (USD/MT)</span>' +
+        '<span class="lbl-idea">ราคาที่ให้เป็นไอเดีย (USD/MT)</span></label>' +
         '<input class="pp-offer-price" type="text" placeholder="เช่น $3,625" value="' + (data.offerPrice||'') + '" oninput="calcFreight(this)"></div>' +
       '<div class="field"><label>%Margin (Offer)</label>' +
         '<input class="pp-offer-margin" type="text" placeholder="เช่น 48.6%" value="' + (data.offerMargin||'') + '"></div>' +
@@ -1555,9 +1646,9 @@ function addProduct(data) {
     '<div class="g3" style="margin-bottom:10px">' +
       '<div class="field"><label>Quantity per Month (MT)</label>' +
         '<input class="pp-qty-month" type="text" placeholder="เช่น 96 MT / 4 FCL" value="' + (data.qtyMonth||'') + '"></div>' +
-      '<div class="field"><label>DATE (วันที่จะเสนอ)</label>' +
+      '<div class="field fld-offer-only"><label>DATE (วันที่จะเสนอ)</label>' +
         '<input class="pp-offer-date" type="text" placeholder="เช่น 10/09/2026" value="' + (data.offerDate||'') + '"></div>' +
-      '<div class="field"><label>VALID (ยืนราคาถึง)</label>' +
+      '<div class="field fld-offer-only"><label>VALID (ยืนราคาถึง)</label>' +
         '<input class="pp-valid" type="text" placeholder="เช่น 7 วัน / ถึง 30/09/2026" value="' + (data.valid||'') + '"></div>' +
     '</div>' +
 
@@ -1662,9 +1753,14 @@ function getProdData() {
       valid:      (b.querySelector('.pp-valid')       ||{}).value||'',
       freight:    (b.querySelector('.pp-freight')     ||{}).value||'',
       mtPerCont:  (b.querySelector('.pp-mtcont')      ||{}).value||'',
-      fx:         (b.querySelector('.pp-fx')          ||{}).value||''
+      fx:         (b.querySelector('.pp-fx')          ||{}).value||'',
+      kindMeta:   offerKind === 'idea' ? 'idea' : ''
     });
   });
+  // โหมดไอเดียราคาไม่มีการยืนราคา ช่อง DATE/VALID ถูกซ่อน — ล้างค่าที่อาจค้างจากตอนสลับโหมด
+  if (offerKind === 'idea') {
+    out.forEach(function(p) { p.offerDate = ''; p.valid = ''; });
+  }
   return out;
 }
 
@@ -1730,7 +1826,7 @@ function updateSessionBar() {
 
 /* ── SUBMIT ── */
 /* ── ข้อมูลเสริมที่ยังไม่มีคอลัมน์ในชีท ฝากไว้ต้นหมายเหตุ ── */
-var META_KEYS = [['DATE','offerDate'], ['VALID','valid'], ['FRT','freight'], ['MTC','mtPerCont'], ['FX','fx']];
+var META_KEYS = [['KIND','kindMeta'], ['DATE','offerDate'], ['VALID','valid'], ['FRT','freight'], ['MTC','mtPerCont'], ['FX','fx']];
 function buildMeta_(p) {
   var parts = META_KEYS.filter(function(k){ return p[k[1]]; })
                        .map(function(k){ return k[0] + ': ' + String(p[k[1]]).replace(/[|\]]/g, ' '); });
@@ -1741,10 +1837,12 @@ function submitForm() {
   var g = function(id) { return document.getElementById(id) ? document.getElementById(id).value.trim() : ''; };
 
   var prods = getProdData();
-  for (var i = 0; i < prods.length; i++) {
-    if (!prods[i].period) {
-      alert('กรุณากรอก "Shipment ที่จะเสนอ" ให้ครบทุกรายการค่ะ (รายการที่ ' + (i+1) + ')');
-      return;
+  if (offerKind !== 'idea') {
+    for (var i = 0; i < prods.length; i++) {
+      if (!prods[i].period) {
+        alert('กรุณากรอก "Shipment ที่จะเสนอ" ให้ครบทุกรายการค่ะ (รายการที่ ' + (i+1) + ')');
+        return;
+      }
     }
   }
 
@@ -1760,9 +1858,17 @@ function submitForm() {
   // ยังไม่มีหมายเหตุ (ตอนนั้นยังไม่ได้พิมพ์) ถ้าไม่เติมให้ ชิ้นแรกจะไปถึงชีทแบบว่าง
   var overallRemark = g('t-remark');
   allSessions.forEach(function(sess) { sess.remark = overallRemark; });
+  // โหมดเป็นของทั้งใบ ชุดที่บันทึกไว้ก่อนสลับโหมดต้องเปลี่ยนตามด้วย
+  allSessions.forEach(function(sess) {
+    (sess.products || []).forEach(function(p) {
+      p.kindMeta = offerKind === 'idea' ? 'idea' : '';
+      if (offerKind === 'idea') { p.offerDate = ''; p.valid = ''; }
+    });
+  });
 
   var payload = {
     ref: refNum, submittedAt: new Date().toISOString(), status: 'pending',
+    offerKind: offerKind,
     salesUser: window._currentUser || '',
     company: g('c-company'), port: g('c-port'),
     incoterm: document.getElementById('t-incoterm').value,
@@ -1829,6 +1935,7 @@ function resetForm() {
   if (document.getElementById('t-remark')) document.getElementById('t-remark').value = '';
   document.getElementById('products-container').innerHTML = '';
   prodCount = 0; completedTabs = {}; savedSessions = []; updateSessionBar();
+  setOfferKind('offer');
   addProduct();
   var btn = document.querySelector('.btn-submit-final');
   if (btn) { btn.textContent = 'ส่งคำขอใบเสนอราคา'; btn.disabled = false; }
@@ -1854,7 +1961,9 @@ function renderSummary() {
   getProdData().forEach(function(p) { allProds.push(p); });
 
   if (!allProds.length) { container.innerHTML = '<div style="color:var(--ink-muted);font-size:13px">ยังไม่มีสินค้า</div>'; return; }
-  container.innerHTML = allProds.map(function(p, i) {
+  var kindLine = '<div class="prod-section-label" style="margin-bottom:12px">ใบนี้คือ: ' +
+    (offerKind === 'idea' ? 'ให้ไอเดียราคา (ยังไม่ยืนราคา)' : 'เสนอราคา') + '</div>';
+  container.innerHTML = kindLine + allProds.map(function(p, i) {
     return '<div class="summary-item">' +
       '<div class="summary-item-head">รายการที่ ' + (i+1) + ': <strong>' + (p.type||'—') + '</strong>' + (p.code ? ' <span class="summary-code">[' + p.code + ']</span>' : '') + '</div>' +
       '<div class="summary-grid">' +
@@ -1863,7 +1972,7 @@ function renderSummary() {
         (p.idea      ? '<span>Idea: '       + p.idea       + '</span>' : '') +
         (p.margin    ? '<span>Margin Idea: '+ p.margin     + '</span>' : '') +
         (p.period    ? '<span class="summary-offer">Shipment: <strong>' + p.period     + '</strong></span>' : '') +
-        (p.offerPrice? '<span class="summary-offer">Offer: <strong>'    + p.offerPrice + '</strong></span>' : '') +
+        (p.offerPrice? '<span class="summary-offer">' + (offerKind === 'idea' ? 'ไอเดียราคา' : 'Offer') + ': <strong>' + p.offerPrice + '</strong></span>' : '') +
         (p.offerMargin?'<span class="summary-offer">%Margin: '          + p.offerMargin+ '</span>' : '') +
         (p.qtyMonth  ? '<span class="summary-offer">Qty/Month: '        + p.qtyMonth   + '</span>' : '') +
       '</div>' +
@@ -1908,6 +2017,9 @@ document.addEventListener('click', function(e) {
 </script>
 <script>
 
+/* รหัสผ่านผู้อนุมัติ — กันคนกดผิดหน้าเท่านั้น ไม่ใช่ระบบยืนยันตัวตนจริง
+   ไฟล์นี้เป็น HTML ล้วนที่เปิดสาธารณะ ใครกด View Source ก็เห็นค่านี้ */
+var PASS = 'approvexx';
 var curUser = null, curKey = null, curFilter = 'pending';
 var approvals = {};
 
@@ -1920,10 +2032,10 @@ function g(row, key) { return (row[key] || '').toString().trim(); }
 
 /* แกะข้อมูลเสริมที่ฝังไว้ต้นหมายเหตุ ออกมาเป็นช่องแยก */
 function stripMeta_(txt) {
-  var out = { text: txt || '', date: '', valid: '', freight: '', mtPerCont: '', fx: '' };
+  var out = { text: txt || '', kind: '', date: '', valid: '', freight: '', mtPerCont: '', fx: '' };
   var m = (txt || '').match(/^\s*\[([^\]]*)\]\s*/);
   if (!m) return out;
-  var keyOf = { DATE:'date', VALID:'valid', FRT:'freight', MTC:'mtPerCont', FX:'fx' };
+  var keyOf = { KIND:'kind', DATE:'date', VALID:'valid', FRT:'freight', MTC:'mtPerCont', FX:'fx' };
   m[1].split('|').forEach(function(seg) {
     var kv = seg.split(':');
     if (kv.length < 2) return;
@@ -2031,6 +2143,7 @@ function parseSheetRows(rows) {
       totalQty:   g(row, 'Total Quantity (MT)'),
       qtyMonth:   g(row, 'Quantity per Month (MT)'),
       remark:     meta_.text,
+      offerKind:  meta_.kind === 'idea' ? 'idea' : 'offer',
       offerDate:  meta_.date,
       valid:      meta_.valid,
       freight:    meta_.freight,
@@ -2059,12 +2172,13 @@ function demoRows() {
       alloc: extra.alloc || '', lastClosed: extra.lastClosed || '', lastOffer: extra.lastOffer || '',
       currency: extra.currency || '', other: extra.other || '',
       period: period, offerPrice: offer, offerMargin: mgOffer,
+      offerKind: extra.offerKind || 'offer',
       totalQty: extra.totalQty || '', qtyMonth: qtyM, remark: extra.remark || ''
     };
   };
   return [
     mk('SFD-2026-0101','07/09/2569 09:12','NIPPON FOODS TRADING','Yokohama, Japan','NICHA','BLK 30-40 g','111327401','96 MT / 4 FCL','OCT-DEC 2026','$3,600','45','Oct/Nov 2026','3900','48.6','24 MT / 1 FCL',{alloc:'FL = 150 MT/month, จัดสรร 2-4 FCL/month',lastClosed:'$3,550 (27/08)',currency:'JPY 157.62'}),
-    mk('SFD-2026-0102','07/09/2569 10:03','SEOUL FRESH IMPORT','Busan, South Korea','NET','MID JOINT WING','111327410','48 MT / 2 FCL','NOV 2026','$4,200','38','Nov 2026','4450','41.2','24 MT / 1 FCL',{payment:'TT 30 days',currency:'KRW 1,330'}),
+    mk('SFD-2026-0102','07/09/2569 10:03','SEOUL FRESH IMPORT','Busan, South Korea','NET','MID JOINT WING','111327410','48 MT / 2 FCL','NOV 2026','$4,200','38','Nov 2026','4450','41.2','24 MT / 1 FCL',{payment:'TT 30 days',currency:'KRW 1,330',offerKind:'idea'}),
     mk('SFD-2026-0103','07/09/2569 11:47','OSAKA GOURMET CO.','Osaka, Japan','KAN','HERB FED YTR BOILED BB SKIN 25 G','111327403','1 FCL','OCT 2026','$4,500','25.34','Oct/Nov 2026','4600','25.34','8.91 (40FT)',{alloc:'ใช้ BB skin, ตอนนี้ no order skin',lastClosed:'$4,500 (06/07)',currency:'JPY 162.09 > 158.84'}),
     mk('SFD-2026-0104','06/09/2569 14:20','TAIPEI PROTEIN LTD.','Kaohsiung, Taiwan','EMMA','BREAST FILLET','111327415','72 MT / 3 FCL','DEC 2026','$5,100','30','Dec 2026/Jan 2027','5300','33.5','24 MT / 1 FCL',{orderType:'ทดลองสั่ง',payment:'LC at Sight'}),
     mk('SFD-2026-0105','06/09/2569 15:55','KOBE MEAT PARTNERS','Kobe, Japan','NICHA','WING STICK','111327408','48 MT / 2 FCL','NOV-DEC 2026','$2,100','30','Nov 2026','2250','35.5','24 MT / 1 FCL',{lastOffer:'$2,200/MT (15/08)',currency:'JPY 157.20'}),
@@ -2086,6 +2200,7 @@ function demoApprovals() {
     'SFD-2026-0106': { A1:'approved', A2:'approved', close:'closed-won', closeShipment:'Nov/Dec 2026', closeQty:'48 MT / 2 FCL', closePrice:'3,300', closeMargin:'41.2%', closeRemark:'ลูกค้าตกลงตามราคาเสนอ ขอเลื่อน shipment เป็นต้นเดือน', closeDate:'2026-09-05' },
     'SFD-2026-0107': { A1:'approved', A2:'approved', close:'closed-won', closeShipment:'Jan 2027', closeQty:'24 MT / 1 FCL', closePrice:'3,900', closeMargin:'47.5%', closeDate:'2026-09-06' },
     'SFD-2026-0108': { A1:'approved', A2:'approved', close:'closed-lost' },
+    'SFD-2026-0105': { A1:'approved', A2:'approved', close:'not-offered', closeRemark:'ลูกค้าเปลี่ยนแผน ยังไม่ได้ส่งราคาให้', closeDate:'2026-09-08' },
     'SFD-2026-0109': { A1:'rejected', remarkA1:'margin ต่ำกว่าเกณฑ์ ขอปรับราคาใหม่' },
     'SFD-2026-0110': { A1:'approved' }
   };
@@ -2144,6 +2259,7 @@ function loadData() {
             approvals[d.ref].extState  = ov[0].slice(4);   // pending | approved | rejected
             approvals[d.ref].extValid  = ov[1] || '';
             approvals[d.ref].extReason = ov[2] || '';
+            approvals[d.ref].extNote   = ov[3] || '';
           }
           if (ov[0] === 'question') {
             approvals[d.ref].question = ov[1] || 'A1';       // ใครถาม
@@ -2153,7 +2269,7 @@ function loadData() {
             approvals[d.ref].superseded = true;
             approvals[d.ref].supersededReason = ov[1] || '';
           }
-          if (ov[0] === 'closed-won' || ov[0] === 'closed-lost') {
+          if (ov[0] === 'closed-won' || ov[0] === 'closed-lost' || ov[0] === 'not-offered') {
             approvals[d.ref].close = ov[0];
             if (ov.length >= 5) {
               CLOSE_FIELDS.forEach(function(f, i){ if (ov[i+1]) approvals[d.ref][f.key] = ov[i+1]; });
@@ -2372,13 +2488,22 @@ var _PLACEHOLDER = [
 
 // ── LOGIN — password only ──
 function doLogin() {
+  var pwEl = document.getElementById('pw');
+  var err  = document.getElementById('pw-err');
+  if (!pwEl || pwEl.value !== PASS) {
+    if (err) err.classList.add('show');
+    if (pwEl) { pwEl.value = ''; pwEl.focus(); }
+    return;
+  }
+  if (err) err.classList.remove('show');
+  pwEl.value = '';
   curUser = 'Approver 1'; curKey = 'A1';
   document.getElementById('ap-login-overlay').style.display = 'none';
   document.getElementById('hdr-user').textContent = curUser;
   loadData(); // ดึงข้อมูลสดจาก Google Sheets
 }
 
-/* กด Enter ที่ไหนก็ได้บนหน้า login ผู้อนุมัติ = เข้าสู่ระบบ */
+/* กด Enter ที่ไหนก็ได้บนหน้า login ผู้อนุมัติ = กดปุ่มเข้าสู่ระบบ (doLogin ตรวจรหัสเอง) */
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'Enter') return;
   var ov = document.getElementById('ap-login-overlay');
@@ -2392,8 +2517,11 @@ document.addEventListener('keydown', function(e) {
 function doLogout() {
   curUser = null; curKey = null; DATA = [];
   document.getElementById('ap-login-overlay').style.display = 'flex';
-  var eb = document.getElementById('ap-enter');
-  if (eb) setTimeout(function(){ eb.focus(); }, 60);
+  var pwEl = document.getElementById('pw');
+  if (pwEl) pwEl.value = '';
+  var err = document.getElementById('pw-err');
+  if (err) err.classList.remove('show');
+  if (pwEl) setTimeout(function(){ pwEl.focus(); }, 60);
 }
 
 // ── FILTER ──
@@ -2436,7 +2564,7 @@ function freightCells_(d) {
 }
 
 function badge(status) {
-  var m = { pending:['badge-pending','รออนุมัติ'], approved:['badge-approved','อนุมัติครบ — รอปิดการขาย'], rejected:['badge-rejected','ปฏิเสธ'], partial:['badge-partial','Approve 1 แล้ว'], 'closed-won':['badge-approved','ปิดการขายได้'], 'closed-lost':['badge-lost','ไม่ปิดการขาย'], 'superseded':['badge-partial','bidding'], 'question':['badge-question','มีคำถาม'] };
+  var m = { pending:['badge-pending','รออนุมัติ'], approved:['badge-approved','อนุมัติครบ — รอปิดการขาย'], rejected:['badge-rejected','ปฏิเสธ'], partial:['badge-partial','Approve 1 แล้ว'], 'closed-won':['badge-approved','ปิดการขายได้'], 'closed-lost':['badge-lost','ไม่ปิดการขาย'], 'not-offered':['badge-notoffer','ไม่เสนอ'], 'superseded':['badge-partial','bidding'], 'question':['badge-question','มีคำถาม'] };
   var s = m[status] || m.pending;
   return '<span class="status-badge ' + s[0] + '">' + s[1] + '</span>';
 }
@@ -2503,18 +2631,31 @@ function submitExtRequest(ref) {
   var reason   = r ? r.value.trim().replace(/\|/g, ' ') : '';
   if (!newValid) { showToast('กรุณากรอก VALID ใหม่ที่ลูกค้าขอ', 'red'); if (v) v.focus(); return; }
   if (!approvals[ref]) approvals[ref] = {};
+  var wasPending = approvals[ref].extState === 'pending';
   approvals[ref].extState = 'pending';
   approvals[ref].extValid = newValid;
   approvals[ref].extReason = reason;
   postSaleState(ref, 'ext-pending|' + newValid + '|' + reason);
-  showToast('ส่งคำขอขยาย VALID ให้ผู้อนุมัติแล้ว', 'green');
+  showToast(wasPending ? 'อัปเดตคำขอขยาย VALID แล้ว' : 'ส่งคำขอขยาย VALID ให้ผู้อนุมัติแล้ว', 'green');
+  renderCards();
+}
+
+/* ยกเลิกคำขอที่ยังไม่ถูกเคาะ — กลับไปเป็นใบที่รอปิดการขายตามปกติ */
+function cancelExtRequest(ref) {
+  var a = approvals[ref] || {};
+  if (a.extState !== 'pending') return;
+  delete a.extState; delete a.extValid; delete a.extReason; delete a.extNote;
+  postSaleState(ref, 'approved');
+  showToast('ยกเลิกคำขอขยาย VALID แล้ว');
   renderCards();
 }
 function decideExtension(ref, ok) {
   if (!approvals[ref]) approvals[ref] = {};
   var a = approvals[ref];
+  var nEl = document.getElementById('ext-note-' + ref);
+  a.extNote = nEl ? nEl.value.trim().replace(/\|/g, ' ') : (a.extNote || '');
   a.extState = ok ? 'approved' : 'rejected';
-  postSaleState(ref, 'ext-' + a.extState + '|' + (a.extValid || '') + '|' + (a.extReason || ''));
+  postSaleState(ref, 'ext-' + a.extState + '|' + (a.extValid || '') + '|' + (a.extReason || '') + '|' + a.extNote);
   showToast(ok ? 'ยืนยันขยาย VALID ถึง ' + a.extValid : 'ไม่อนุมัติการขยาย VALID', ok ? 'green' : 'red');
   renderCards();
 }
@@ -2554,6 +2695,7 @@ function reviseOffer(ref, mode) {
 
   document.getElementById('products-container').innerHTML = '';
   prodCount = 0; savedSessions = []; completedTabs = {}; updateSessionBar();
+  setOfferKind(d.offerKind === 'idea' ? 'idea' : 'offer');
   var prods = (d.products && d.products.length) ? d.products : [{}];
   prods.forEach(function(p, idx) {
     addProduct({
@@ -2671,9 +2813,10 @@ function closeSale(ref, result) {
   approvals[ref].closeRemark = remark;
   approvals[ref].closeDate = closeDate;
   postSaleState(ref, vals ? result + '|' + vals.join('|') : result);
-  showToast(result === 'closed-won'
-    ? 'บันทึกแล้ว: ปิดการขายได้ ' + approvals[ref].closePrice + ' USD/MT'
-    : 'บันทึกแล้ว: ไม่ปิดการขาย', result === 'closed-won' ? 'green' : 'red');
+  var doneMsg = { 'closed-won': 'บันทึกแล้ว: ปิดการขายได้ ' + approvals[ref].closePrice + ' USD/MT',
+                  'closed-lost': 'บันทึกแล้ว: ไม่ปิดการขาย',
+                  'not-offered': 'บันทึกแล้ว: ไม่เสนอราคานี้ให้ลูกค้า' };
+  showToast(doneMsg[result] || 'บันทึกแล้ว', result === 'closed-won' ? 'green' : 'red');
   renderCards();
 }
 function undoClose(ref) {
@@ -2758,7 +2901,7 @@ function renderCards() {
     data = DATA.filter(function(d) {
       var st = getStatus(d.ref);
       return st === 'approved' || st === 'closed-won' || st === 'closed-lost' ||
-             st === 'rejected' || st === 'superseded' || st === 'question';
+             st === 'not-offered' || st === 'rejected' || st === 'superseded' || st === 'question';
     });
   }
   var filt = (curFilter === 'ext-pending')
@@ -2819,11 +2962,11 @@ function renderCards() {
     if (d.period || d.offerPrice || d.offerMargin || d.qtyMonth || d.offerDate || d.valid || d.freight) {
       offerDetail = '<div class="offer-detail">' +
         (d.period ? '<div class="detail-cell"><div class="dl">Shipment ที่เสนอ</div><div class="dv">' + d.period + '</div></div>' : '') +
-        (d.offerPrice ? '<div class="detail-cell"><div class="dl">ราคาเสนอ</div><div class="dv dv-red">$' + d.offerPrice + '/MT</div></div>' : '') +
+        (d.offerPrice ? '<div class="detail-cell"><div class="dl">' + (d.offerKind === 'idea' ? 'ไอเดียราคา' : 'ราคาเสนอ') + '</div><div class="dv dv-red">$' + d.offerPrice + '/MT</div></div>' : '') +
         (d.offerMargin ? '<div class="detail-cell"><div class="dl">%Margin</div><div class="dv ' + (mgClass(d.offerMargin) === 'mg-h' ? 'dv-green' : mgClass(d.offerMargin) === 'mg-l' ? 'dv-red' : '') + '">' + d.offerMargin + '%</div></div>' : '') +
         (d.qtyMonth ? '<div class="detail-cell"><div class="dl">Qty/Month</div><div class="dv">' + d.qtyMonth + '</div></div>' : '') +
-        (d.offerDate ? '<div class="detail-cell"><div class="dl">Date ที่จะเสนอ</div><div class="dv">' + d.offerDate + '</div></div>' : '') +
-        (d.valid ? '<div class="detail-cell"><div class="dl">Valid</div><div class="dv">' + d.valid + '</div></div>' : '') +
+        (d.offerDate && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Date ที่จะเสนอ</div><div class="dv">' + d.offerDate + '</div></div>' : '') +
+        (d.valid && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Valid</div><div class="dv">' + d.valid + '</div></div>' : '') +
         freightCells_(d) +
         (d.totalQty ? '<div class="detail-cell"><div class="dl">Total Qty</div><div class="dv">' + d.totalQty + '</div></div>' : '') +
         '</div>';
@@ -2875,12 +3018,19 @@ function renderCards() {
           '<div class="slot-label">คำขอขยาย VALID จากทีมขาย</div>' +
           '<div class="ext-compare">ยืนราคาเดิม: <b>' + (d.valid || '—') + '</b> &nbsp;→&nbsp; ขอขยายเป็น: <b>' + av.extValid + '</b></div>' +
           (av.extReason ? '<div class="ext-reason">' + av.extReason + '</div>' : '') +
+          '<div class="close-field" style="margin-top:10px"><label>หมายเหตุถึงทีมขาย (ถ้ามี)</label>' +
+            '<textarea id="ext-note-' + d.ref + '" class="close-input close-remark" rows="2" ' +
+            'placeholder="เช่น ยืนได้ถึงสิ้นเดือนเท่านั้น เพราะค่าเฟรทรอบใหม่ขึ้น">' + (av.extNote || '') + '</textarea></div>' +
           '<div class="vote-buttons" style="margin-top:10px">' +
             '<button class="vote-btn btn-approve" onclick="decideExtension(\'' + d.ref + '\',true)">ยืนยันวันใหม่</button>' +
             '<button class="vote-btn btn-reject" onclick="decideExtension(\'' + d.ref + '\',false)">ไม่อนุมัติ</button>' +
           '</div></div>';
       } else if (av.extState === 'approved') {
-        extDecide = '<div class="ext-note ok"><b>ขยาย VALID แล้ว</b> — ยืนราคาถึง <b>' + av.extValid + '</b></div>';
+        extDecide = '<div class="ext-note ok"><b>ขยาย VALID แล้ว</b> — ยืนราคาถึง <b>' + av.extValid + '</b>' +
+          (av.extNote ? '<div class="ext-reason">' + av.extNote + '</div>' : '') + '</div>';
+      } else if (av.extState === 'rejected') {
+        extDecide = '<div class="ext-note no"><b>ไม่อนุมัติการขยาย VALID</b> — ยังยืนตามกำหนดเดิม' +
+          (av.extNote ? '<div class="ext-reason">' + av.extNote + '</div>' : '') + '</div>';
       }
       approveHtml = '<div class="approve-section">' +
         qBox + extDecide +
@@ -2919,7 +3069,7 @@ function renderCards() {
         '<button class="vote-btn btn-revise" style="margin-top:12px" onclick="reviseOffer(\'' + d.ref + '\')">แก้ไขและส่งใหม่</button>' +
       '</div></div>';
     }
-    else if (window._statusMode && (status === 'approved' || status === 'closed-won' || status === 'closed-lost')) {
+    else if (window._statusMode && (status === 'approved' || status === 'closed-won' || status === 'closed-lost' || status === 'not-offered')) {
       var closeInner;
       if (status === 'approved') {
         var inputs = CLOSE_FIELDS.map(function(f) {
@@ -2935,6 +3085,7 @@ function renderCards() {
           '<div class="vote-buttons" style="margin-top:12px">' +
             '<button class="vote-btn btn-approve" onclick="closeSale(\'' + d.ref + '\',\'closed-won\')">ปิดการขายได้</button>' +
             '<button class="vote-btn btn-reject" onclick="closeSale(\'' + d.ref + '\',\'closed-lost\')">ไม่ปิดการขาย</button>' +
+            '<button class="vote-btn btn-notoffer" onclick="closeSale(\'' + d.ref + '\',\'not-offered\')" title="ไม่ได้เสนอราคานี้ให้ลูกค้า — ระบุเหตุผลใน Remark">ไม่เสนอ</button>' +
           '</div>';
       } else if (status === 'closed-won') {
         var cells = '<div class="close-cell"><div class="dl">วันที่ปิดการขาย</div><div class="dv">' + thaiDate(av.closeDate) + '</div></div>' +
@@ -2944,6 +3095,10 @@ function renderCards() {
         closeInner = '<div class="close-summary">' + cells +
           '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">แก้ไข</button></div>' +
           (av.closeRemark ? '<div class="close-remark-note"><b>Remark:</b> ' + av.closeRemark + '</div>' : '');
+      } else if (status === 'not-offered') {
+        closeInner = '<div class="vote-result notoffer">ไม่เสนอราคานี้ให้ลูกค้า' +
+          '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">แก้ไข</button></div>' +
+          (av.closeRemark ? '<div class="close-remark-note"><b>เหตุผล:</b> ' + av.closeRemark + '</div>' : '');
       } else {
         closeInner = '<div class="vote-result rejected">ไม่ปิดการขาย' +
           '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">แก้ไข</button></div>' +
@@ -2952,29 +3107,40 @@ function renderCards() {
       var negotiate = '';
       if (status === 'approved') {
         var extBox = '';
+        var extNote_ = av.extNote ? '<div class="ext-reason"><b>ผู้อนุมัติ:</b> ' + av.extNote + '</div>' : '';
         if (av.extState === 'pending') {
           extBox = '<div class="ext-note pending"><b>รอผู้อนุมัติยืนยัน</b> — ขอขยาย VALID เป็น <b>' + av.extValid + '</b>' +
-            (av.extReason ? '<div class="ext-reason">' + av.extReason + '</div>' : '') + '</div>';
+            (av.extReason ? '<div class="ext-reason">' + av.extReason + '</div>' : '') +
+            '<div class="ext-actions">' +
+              '<button class="btn-undo" onclick="toggleExtForm(\'' + d.ref + '\')">แก้ไขคำขอ</button>' +
+              '<button class="btn-undo" onclick="cancelExtRequest(\'' + d.ref + '\')">ยกเลิกคำขอ</button>' +
+            '</div></div>';
         } else if (av.extState === 'approved') {
-          extBox = '<div class="ext-note ok"><b>ผู้อนุมัติยืนยันขยาย VALID แล้ว</b> — ยืนราคาถึง <b>' + av.extValid + '</b></div>';
+          extBox = '<div class="ext-note ok"><b>ผู้อนุมัติยืนยันขยาย VALID แล้ว</b> — ยืนราคาถึง <b>' + av.extValid + '</b>' +
+            extNote_ + '</div>';
         } else if (av.extState === 'rejected') {
-          extBox = '<div class="ext-note no"><b>ผู้อนุมัติไม่อนุมัติการขยาย VALID</b> — ยังยืนตามกำหนดเดิม</div>';
+          extBox = '<div class="ext-note no"><b>ผู้อนุมัติไม่อนุมัติการขยาย VALID</b> — ยังยืนตามกำหนดเดิม' +
+            extNote_ + '</div>';
         }
         negotiate =
           '<div class="nego-row">' +
             '<div class="slot-label">ลูกค้าขอต่อรอง</div>' +
             '<div class="vote-buttons">' +
-              '<button class="vote-btn btn-nego" onclick="toggleExtForm(\'' + d.ref + '\')">ขอขยาย VALID</button>' +
+              (d.offerKind === 'idea' ? '' : '<button class="vote-btn btn-nego" onclick="toggleExtForm(\'' + d.ref + '\')">ขอขยาย VALID</button>') +
               '<button class="vote-btn btn-nego" onclick="requestBidding(\'' + d.ref + '\')">ลูกค้าขอ bidding</button>' +
             '</div>' +
             '<div class="ext-form" id="ext-form-' + d.ref + '" style="display:none">' +
-              '<div class="close-grid" style="grid-template-columns:1fr 2fr">' +
+              '<div class="close-grid ext-grid">' +
                 '<div class="close-field"><label>VALID ใหม่ที่ลูกค้าขอ</label>' +
                   '<input id="ext-valid-' + d.ref + '" class="close-input" type="text" placeholder="' + (d.valid ? 'เดิม ' + d.valid : 'เช่น ถึง 30/09/2026') + '" value="' + (av.extValid || '') + '"></div>' +
                 '<div class="close-field"><label>เหตุผล / รายละเอียด</label>' +
-                  '<input id="ext-reason-' + d.ref + '" class="close-input" type="text" placeholder="เช่น ลูกค้ารออนุมัติงบภายในสิ้นเดือน" value="' + (av.extReason || '') + '"></div>' +
+                  '<textarea id="ext-reason-' + d.ref + '" class="close-input close-remark" rows="2" placeholder="เช่น ลูกค้ารออนุมัติงบภายในสิ้นเดือน จึงขอยืนราคาต่ออีก 2 สัปดาห์">' + (av.extReason || '') + '</textarea></div>' +
               '</div>' +
-              '<button class="vote-btn btn-approve" style="margin-top:10px" onclick="submitExtRequest(\'' + d.ref + '\')">ส่งคำขอให้ผู้อนุมัติ</button>' +
+              '<div class="vote-buttons" style="margin-top:10px">' +
+                '<button class="vote-btn btn-approve" onclick="submitExtRequest(\'' + d.ref + '\')">' +
+                  (av.extState === 'pending' ? 'อัปเดตคำขอ' : 'ส่งคำขอให้ผู้อนุมัติ') + '</button>' +
+                '<button class="vote-btn btn-nego" onclick="toggleExtForm(\'' + d.ref + '\')">ปิด</button>' +
+              '</div>' +
             '</div>' +
             extBox +
           '</div>';
@@ -2996,6 +3162,7 @@ function renderCards() {
             (d.incoterm ? '<span class="tag tag-incoterm">' + d.incoterm + '</span>' : '') +
             (d.payment ? '<span class="tag tag-payment">' + d.payment + '</span>' : '') +
             (d.orderType ? '<span class="tag tag-order">' + d.orderType + '</span>' : '') +
+            (d.offerKind === 'idea' ? '<span class="tag tag-kind">ไอเดียราคา</span>' : '') +
           '</div>' +
         '</div>' +
         '<div class="card-status-area">' + badge(status) + '<div class="card-ts">' + (d.ts || '—') + '</div></div>' +
@@ -3144,7 +3311,8 @@ function updateFilterCounts_(data) {
   var map = {
     'filter-pending': 'pending', 'filter-partial': 'partial', 'filter-approved': 'approved',
     'filter-rejected': 'rejected', 'filter-closed-won': 'closed-won',
-    'filter-closed-lost': 'closed-lost', 'filter-superseded': 'superseded',
+    'filter-closed-lost': 'closed-lost', 'filter-not-offered': 'not-offered',
+    'filter-superseded': 'superseded',
     'filter-question': 'question'
   };
   var count = function(st){ return data.filter(function(d){ return getStatus(d.ref) === st; }).length; };
@@ -3310,8 +3478,8 @@ function enterRole(role) {
   document.getElementById('offer-app').style.display = (useApproveApp || isSetting) ? 'none' : 'block';
   if (isSetting) { renderSettings(); return; }
   if (role === 'approve') {
-    var enterBtn = document.getElementById('ap-enter');
-    if (enterBtn) setTimeout(function(){ enterBtn.focus(); }, 60);
+    var pwEl = document.getElementById('pw');
+    if (pwEl) setTimeout(function(){ pwEl.focus(); }, 60);
   }
   if (window._summaryMode) {
     document.getElementById('ap-login-overlay').style.display = 'none';
@@ -3332,7 +3500,7 @@ function enterRole(role) {
   }
   if (role === 'approve') {
     // ผลการปิดการขายเป็นงานของทีมขาย — ดูได้ในหน้าเช็คสถานะ
-    ['filter-closed-won','filter-closed-lost'].forEach(function(id){
+    ['filter-closed-won','filter-closed-lost','filter-not-offered'].forEach(function(id){
       var b = document.getElementById(id); if (b) b.style.display = 'none';
     });
   }
