@@ -1,150 +1,149 @@
 # SunFood — Offer & Approval System
-**Handoff Document**
-Last updated: May 2026
+
+**Handoff** · อัปเดต 10 กันยายน 2026
+
+ระบบเสนอราคา–อนุมัติ–ปิดการขาย ของทีม Export Sales และ Food Supply Chain
+ทั้งระบบอยู่ในไฟล์เดียว: `index.html` (ไม่มี build step ไม่มี dependency นอกจาก Google Fonts)
 
 ---
 
-## Overview
+## URL ใช้งานจริง
 
-ระบบนี้มีสองส่วนทำงานต่อกัน:
+| ที่ | ลิงก์ | อัปเดตยังไง |
+|---|---|---|
+| GitHub Pages | https://nichasenapeng.github.io/Offer_price/ | push แล้ว build เอง |
+| Cloudflare Worker | https://sunfood-offer.nichasenapeng13.workers.dev | ต้อง `wrangler deploy` เอง |
 
-1. **Offer Form** — ทีมขายกรอก inquiry ของลูกค้า → บันทึกลง Google Sheets
-2. **Approve Dashboard** — หัวหน้า/ผู้อนุมัติดูและ approve/reject offer → บันทึกลง Google Sheets อีกไฟล์
+**ลิงก์เข้าโหมดตรง** — ต่อท้าย `?mode=offer` · `approve` · `status` · `summary` · `setting`
+**ดูพร้อมข้อมูลตัวอย่าง** — ต่อท้าย `?demo=1` (ใช้ร่วมกับ `mode` ได้)
 
 ---
 
-## 1. Offer Form (ทีมขาย)
+## 5 โหมดในไฟล์เดียว
 
-**URL:** https://nichasenapeng.github.io/Offer_price/
+หน้าแรกเป็นการ์ดสี่เหลี่ยมให้เลือกโหมด กดโลโก้ SUNFOOD ที่มุมซ้ายบนเพื่อกลับหน้านี้เสมอ
 
-**วิธีใช้:**
-1. เลือกชื่อผู้ใช้ (NICHA / NET / KAN / EMMA)
-2. Step 1 — กรอก Customer: Company Name, Destination Port, Incoterm, Payment Term, Order Type
-3. Step 2 — กรอก Inquiry: สินค้า, Qty, Idea Price, Shipment ที่จะเสนอ, ราคาเสนอ (%Margin), ข้อมูลประกอบ
-4. Step 3 — ตรวจสอบสรุป → กด "ส่งคำขอใบเสนอราคา"
-5. ระบบสร้าง REF เช่น `SFD-2026-XXXX` และแสดงหน้า Success
+| โหมด | ใคร | ทำอะไร |
+|---|---|---|
+| **Offer** | ทีมขาย | กรอกใบเสนอราคา 3 ขั้น (Customer → Inquiry → สรุป & ส่ง) |
+| **Approve** | ผู้อนุมัติ (ไม่ต้องใช้รหัส กด Enter เข้าได้เลย) | Approve / Reject / **มีคำถาม** แยก 2 ช่อง A1, A2 |
+| **Status** | ทีมขาย | ตามผลหลังอนุมัติ ปิดการขาย ตอบคำถาม ขอขยาย VALID ขอ bidding |
+| **Summary** | ทุกคน | สรุปการปิดการขายรายวัน ปริมาณ (MT) และมูลค่า (USD) |
+| **Setting** | แอดมิน | ค่าเริ่มต้นฟอร์ม · **ตารางค่าเฟรทรายเดือนแยก port** · ลิงก์ระบบ |
 
-**เพิ่มสินค้าหลายรายการ:** กดปุ่ม "เพิ่มสินค้า" ใน Step 3 — ระบบจะบันทึกชุดเดิมไว้และ reset form ให้กรอกสินค้าใหม่
+---
 
-**Google Sheet (ข้อมูล Offer):**
-https://docs.google.com/spreadsheets/d/15fxIAqk32f898h4nN-CG1HstFe3GPSy-33ALiJlJHwU/edit#gid=954990774
+## Flow สถานะ
 
-คอลัมน์หลัก:
-| คอลัมน์ | คำอธิบาย |
-|---|---|
-| Timestamp | วันเวลาที่กรอก |
-| REF | รหัสอ้างอิง เช่น SFD-2026-7508 |
-| Status | ชื่อ Sales User ที่กรอก |
-| Company | ชื่อบริษัทลูกค้า |
-| Destination Port | ท่าเรือปลายทาง |
-| Product | ประเภทสินค้า |
-| Quantity Request | ปริมาณที่ลูกค้าขอ |
-| Shipment Request | เดือนที่ขอส่ง |
-| Idea Price | ราคาที่ลูกค้าอยากได้ |
-| %Margin (Idea) | Margin ตาม Idea Price |
-| Shipment ที่จะเสนอ | เดือนที่เราจะเสนอ |
-| ราคาเสนอ (USD/MT) | ราคาที่เราจะเสนอ |
-| %Margin (Offer) | Margin ตามราคาที่เสนอ |
-| Quantity per Month (MT) | ปริมาณต่อเดือน |
+```
+ส่งใบ → pending
+          ├─ A1 หรือ A2 กด Approve       → partial → (อีกคน Approve) → approved
+          ├─ ใครกด Reject                → rejected → ทีมขายกด "แก้ไขและส่งใหม่" → ใบใหม่ REF ใหม่
+          └─ ใครกด "มีคำถาม"             → question → ทีมขายตอบในใบเดิม → กลับมาให้เคาะ
 
-**Apps Script (POST endpoint):**
+approved → ทีมขายเลือก
+          ├─ ปิดการขายได้     → closed-won   (บันทึก shipment/qty/ราคา/margin/remark/วันที่)
+          ├─ ไม่ปิดการขาย     → closed-lost
+          ├─ ขอขยาย VALID     → ext-pending → ผู้อนุมัติยืนยัน/ไม่อนุมัติ (REF เดิม ไม่ออกใบใหม่)
+          └─ ลูกค้าขอ bidding → ใบเดิมเป็น superseded + เปิดฟอร์มใหม่พร้อมข้อมูลเดิม
+```
+
+**ระหว่างมีคำถามค้าง ปิดการขายไม่ได้** — ตั้งใจให้เป็นแบบนั้น
+
+---
+
+## Backend: Google Sheets + Apps Script 2 ตัว
+
+**Script 1 — เขียนใบเสนอราคา** (ผูกกับ Sheet "EXPORT SALES _ OFFER", tab `Inquiry Requests`)
 `https://script.google.com/macros/s/AKfycbyAfBG-BNJfw7y7MnbC6t4zC4Vckewu-VGQBBgSnEhAXqHEYRyFxjmKuvoLZxpM-Lw/exec`
+รับ GET `?data=<JSON>` → เขียน 1 แถวต่อ 1 สินค้า
+สำเนาโค้ดอยู่ใน `Code.gs` แต่ **ตัวที่ deploy จริงใหม่กว่า อย่า copy ทับทั้งไฟล์**
+
+**Script 2 — อ่านทั้งหมด + เขียนผลอนุมัติ** (ผูกกับ Sheet "EXPORT SALES _ APPROVE")
+`https://script.google.com/macros/s/AKfycbzaa16CiQbLUhCNTiIkVSuFhCfEgrYsz342t6GmOc1c-IY3KiOEmvS4ZWXcZHwMAtTS/exec`
+- GET → คืนใบทั้งหมด จัดกลุ่มตาม REF พร้อม `products[]`
+- POST (no-cors) → บันทึก A1/A2/หมายเหตุ/สถานะรวม
+
+Sheet: [Offer](https://docs.google.com/spreadsheets/d/15fxIAqk32f898h4nN-CG1HstFe3GPSy-33ALiJlJHwU/edit) · [Approval](https://docs.google.com/spreadsheets/d/1ZKrNVK1Mgffl1UqTGw8QxMld3hpTnlfZgpcgrwoNyHU/edit)
 
 ---
 
-## 2. Approve Dashboard (หัวหน้า)
+## จุดที่ต้องรู้ก่อนแก้โค้ด
 
-**URL:** https://nichasenapeng.github.io/Approve_price/
+**1. ข้อมูลบางอย่างฝากไว้ในคอลัมน์ที่มีอยู่ เพราะเพิ่มคอลัมน์ในชีทไม่ได้**
 
-**วิธีใช้:**
-1. ใส่รหัสผ่าน: `362254`
-2. ดู offer cards ที่แสดงข้อมูลจาก Google Sheets
-3. กรอง: รออนุมัติ / Approve 1 แล้ว / อนุมัติครบ / ปฏิเสธ
-4. กด **Approve** หรือ **Reject** ใน slot A1 หรือ A2
-5. ใส่หมายเหตุ (ถ้ามี) → ระบบบันทึกกลับ Sheet อัตโนมัติ
-
-**Status Logic:**
-| เงื่อนไข | Status |
-|---|---|
-| ยังไม่มีการ vote | Pending |
-| Vote แล้ว 1 คน (A1 หรือ A2) | Partial |
-| A1 และ A2 = approved | Approved |
-| A1 หรือ A2 = rejected | Rejected |
-
-**Google Sheet (ข้อมูล Approval):**
-https://docs.google.com/spreadsheets/d/1ZKrNVK1Mgffl1UqTGw8QxMld3hpTnlfZgpcgrwoNyHU/edit#gid=0
-
-คอลัมน์หลัก: REF, Company, A1, A2, Status, Remark
-
-**Apps Script (GET + POST endpoint):**
-`https://script.google.com/macros/s/AKfycbwbnv-rKPWsoCMh0YNzRuoN_Y0iXYcqJDaXaw9uwS0z7CEd36MVGB2ZHjeUvwWCA3yw/exec`
-
-- **GET** — โหลด offer ทั้งหมดจาก Sheet 1 ส่งกลับเป็น JSON
-- **POST (no-cors)** — รับ approval decision บันทึกลง Sheet 2
-
----
-
-## 3. Flow สรุป
-
+คอลัมน์ `หมายเหตุ` เก็บ meta ไว้ต้นข้อความ แล้วแกะออกตอนอ่านด้วย `stripMeta_()`
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  ฝั่งทีมขาย                                                      │
-│                                                                  │
-│  ทีมขาย  ──กรอก form──▶  Offer Form  ──POST──▶  Apps Script 1  │
-│                           (GitHub)                    │          │
-│                                                       │ write    │
-│                                                       ▼          │
-│                                              Sheet 1 (Offer)     │
-└─────────────────────────────────────────────────────────────────┘
-                                                       │
-                                                       │ GET (โหลดทุกครั้งที่เปิด/รีเฟรช)
-                                                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  ฝั่งหัวหน้า                                                      │
-│                                                                  │
-│  Apps Script 2  ──JSON──▶  Approve Dashboard  ──ดู/กด──▶  หัวหน้า│
-│       ▲                        (GitHub)                          │
-│       │ POST (approve/reject)                                    │
-│       └────────────────────────────────────────────────────────  │
-│                                                                  │
-│  Apps Script 2  ──write──▶  Sheet 2 (Approval)                  │
-└─────────────────────────────────────────────────────────────────┘
+[DATE: 10/09/2026 | VALID: 7 วัน | FRT: 3000 | MTC: 24 | FX: 32] หมายเหตุที่ทีมขายพิมพ์
 ```
 
-**จุดสำคัญ — Apps Script มี 2 ตัวแยกกัน:**
+คอลัมน์ `สถานะรวม` เก็บสถานะแบบมี payload คั่นด้วย `|`
+```
+closed-won|shipment|qty|price|margin|remark|YYYY-MM-DD
+closed-lost|||||remark|YYYY-MM-DD
+ext-pending|VALID ใหม่|เหตุผล      ext-approved|... ext-rejected|...
+question|A1                         question|A1|คำตอบจากทีมขาย
+superseded|เหตุผล
+```
+ค่าที่ผู้ใช้พิมพ์จะถูกล้าง `|` ออกก่อนเสมอ เพื่อไม่ให้ข้อมูลเพี้ยน
 
-| Script | อยู่ที่ | หน้าที่ |
-|---|---|---|
-| Apps Script 1 | Offer Sheet | รับ POST จาก Offer Form → บันทึกลง Sheet 1 |
-| Apps Script 2 | Approve Sheet | GET: ส่งข้อมูล Sheet 1 ให้ Dashboard / POST: บันทึก approval ลง Sheet 2 |
+**2. ส่งข้อมูลต้อง encode 2 ชั้น**
+`encodeURIComponent(encodeURIComponent(json))` — เพราะ Apps Script decode ซ้ำอีกรอบ
+ถ้า encode ชั้นเดียว ค่าที่มี `%` (เช่น "48.6%") จะทำให้ server พังทั้งแถวแบบเงียบ ๆ
 
-Apps Script 2 ทำ **สองหน้าที่ในไฟล์เดียว** — ถ้าจะแก้ logic การ approve ต้องแก้ที่นี่เท่านั้น
+**3. ใช้ `fetch` ไม่ใช่ `Image` beacon**
+หน้า "ส่งสำเร็จ" ขึ้นเฉพาะเมื่อ server ตอบ ok จริง ถ้าล้มเหลวจะเตือนให้ส่งใหม่
 
----
+**4. หมายเหตุรวมต้องติดไปทุกสินค้า**
+`submitForm()` เขียน `overallRemark` ลงทุก session — เพราะ Script 2 อ่านค่าจากแถวแรกของ REF
+ถ้าติดเฉพาะสินค้าชิ้นสุดท้าย ผู้อนุมัติจะไม่เห็นหมายเหตุเลย
 
-## 4. Files & Repositories
-
-| ไฟล์ | คำอธิบาย | Repo |
-|---|---|---|
-| `index.html` (Offer) | Inquiry form สำหรับทีมขาย | github.com/nichasenapeng/Offer_price |
-| `index.html` (Approve) | Approval dashboard สำหรับหัวหน้า | github.com/nichasenapeng/Approve_price |
-
-ทั้งสองไฟล์เป็น Single-page HTML ไม่มี dependencies ภายนอกนอกจาก Google Fonts และ Apps Script
-
----
-
-## 5. สิ่งที่ต้องดูแล
-
-- **รหัสผ่าน Approve** (`362254`) ฝังอยู่ใน HTML ตรงๆ — ควรอัปเดตหากต้องการเพิ่มความปลอดภัย
-- **Apps Script POST** ใช้ `mode: 'no-cors'` — ไม่สามารถรับ response กลับได้ แต่ข้อมูลบันทึกถึง Sheet
-- **Approval state** เก็บใน browser memory (`approvals` object) — หากรีเฟรชหน้า ระบบจะโหลดใหม่จาก Sheet ผ่าน `_sheetA1` / `_sheetA2`
-- **REF number** สร้างแบบ random (`Math.random`) — โอกาสซ้ำต่ำมาก แต่ไม่เป็น 0
+**5. ตารางค่าเฟรท** อยู่ในตัวแปร `DEFAULT_FREIGHT` (47 port, 12 กลุ่ม)
+แก้ใน Setting = เก็บใน localStorage ของเครื่องนั้นเท่านั้น
+ถ้าจะอัปเดตให้ทั้งทีม ต้องแก้ `DEFAULT_FREIGHT` ในโค้ดแล้ว deploy
 
 ---
 
-## 6. ผู้ใช้งาน
+## วิธี deploy
 
-| บทบาท | ผู้ใช้ | ระบบ |
-|---|---|---|
-| ทีมขาย | NICHA, NET, KAN, EMMA | Offer Form |
-| ผู้อนุมัติ | Approver 1, Approver 2 | Approve Dashboard |
+**ทำเมื่อผู้ใช้สั่งเท่านั้น และต้องขึ้นทั้งสองที่**
+
+**GitHub** — repo คือ `nichasenapeng/Offer_price` แต่ `gh` ในเครื่อง active เป็น `aiengsunfood` ซึ่ง push ไม่ได้
+```bash
+gh auth switch -u nichasenapeng
+git -c credential.helper='!gh auth git-credential' push origin main
+gh auth switch -u aiengsunfood
+```
+
+**Cloudflare** — worker `sunfood-offer` อยู่บนบัญชีของ nicha (`186b05df927d0192ed92ec799dc1b2a0`)
+copy `index.html` ไปเป็น `public/index.html` คู่กับ `wrangler.toml`:
+```toml
+name = "sunfood-offer"
+compatibility_date = "2026-01-01"
+[assets]
+directory = "./public"
+```
+```bash
+CLOUDFLARE_ACCOUNT_ID=186b05df927d0192ed92ec799dc1b2a0 npx wrangler deploy
+```
+token หมดอายุบ่อย และเวลา refresh เองมันเด้งกลับไปเป็นบัญชี ai.eng.sunfood ซึ่งเข้า worker ของ nicha ไม่ได้
+ต้อง `npx wrangler login` ใหม่ แล้วให้ผู้ใช้กด Allow **ภายใน 2 นาที** โดยเบราว์เซอร์ต้อง sign in เป็น nicha อยู่ก่อน
+
+เสร็จแล้วเทียบ md5 ของทั้งสอง URL กับไฟล์ในเครื่องก่อนบอกว่าเสร็จ
+
+---
+
+## ผู้ใช้
+
+**Export Sales Team** — NICHA · NET · KAN · EMMA · MAI
+**Food Supply Chain** — MAY · MILK · ANCHAN · TIK · ICE
+**ผู้อนุมัติ** — Approver 1 (A1), Approver 2 (A2) · ไม่มีรหัสผ่านแล้ว ใครมีลิงก์เข้าได้
+
+---
+
+## ข้อจำกัดที่ยังอยู่
+
+- ไม่มีระบบยืนยันตัวตนจริง ใครมีลิงก์กด Approve ได้
+- ค่าใน Setting เก็บแยกตามเครื่อง ไม่ sync ข้ามผู้ใช้
+- ใบที่ส่งก่อน 10 ก.ย. 2026 และมีหลายสินค้า จะไม่เห็นหมายเหตุ (ข้อมูลค้างอยู่แถวหลัง)
+- REF สุ่มด้วย `Math.random()` โอกาสซ้ำต่ำแต่ไม่เป็นศูนย์
