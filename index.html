@@ -724,6 +724,11 @@ body::before, body::after { display: none !important; }
 .btn-notoffer{background:#eef2f7;color:#475569;border:1.5px solid #cbd5e1}
 .btn-notoffer:hover{background:#475569;color:#fff;transform:translateY(-1px);box-shadow:0 4px 14px rgba(71,85,105,.28)}
 .vote-result.notoffer{background:#eef2f7;color:#475569;border:1px solid #cbd5e1}
+/* ลบ = ซ่อนจากหน้าจอ แถวยังอยู่ในชีท กู้คืนได้ตลอด */
+.btn-trash{background:transparent;color:var(--ink-muted);border:1.5px dashed #cbd5e1}
+.btn-trash:hover{background:var(--red);color:#fff;border-color:var(--red);border-style:solid}
+.vote-result.deleted{background:#f3f4f6;color:#6b7280;border:1px dashed #9ca3af}
+.trash-note{font-size:12px;color:var(--ink-muted);margin-top:8px;line-height:1.6}
 .btn-undo{
   font-size:11px;font-weight:500;color:var(--ink-muted);
   background:rgba(0,0,0,.06);border:1px solid var(--border);
@@ -825,6 +830,7 @@ body::before, body::after { display: none !important; }
 #offer-app .header-tag{margin-left:16px}
 .badge-lost{background:rgba(243,244,246,0.9);color:#6b7280;border:1px solid #d1d5db}
 .badge-notoffer{background:#eef2f7;color:#475569;border:1px solid #cbd5e1}
+.badge-deleted{background:#f3f4f6;color:#6b7280;border:1px dashed #9ca3af}
 #approve-app .close-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 #approve-app .close-field label{display:block;font-size:10px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
 #approve-app .close-input{width:100%;padding:9px 14px;background:rgba(255,255,255,0.9);border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:"Kanit",sans-serif;font-size:14px;font-weight:600;color:var(--ink);transition:border-color .2s,box-shadow .2s}
@@ -1407,6 +1413,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
   <button class="filter-btn" id="filter-superseded" onclick="setFilter('superseded',this)">bidding</button>
   <button class="filter-btn" id="filter-question" onclick="setFilter('question',this)">มีคำถาม</button>
   <button class="filter-btn" id="filter-ext" onclick="setFilter('ext-pending',this)">ขอขยาย VALID</button>
+  <button class="filter-btn" id="filter-deleted" onclick="setFilter('deleted',this)">ถังขยะ</button>
 </div>
 
 <div class="section-heading">
@@ -2273,6 +2280,9 @@ function loadData() {
             approvals[d.ref].question = ov[1] || 'A1';       // ใครถาม
             if (ov[2]) approvals[d.ref].questionReply = ov[2]; // ทีมขายตอบกลับ
           }
+          if (ov[0] === 'deleted') {
+            approvals[d.ref].deleted = true;
+          }
           if (ov[0] === 'superseded') {
             approvals[d.ref].superseded = true;
             approvals[d.ref].supersededReason = ov[1] || '';
@@ -2543,6 +2553,7 @@ function setFilter(f, btn) {
 // ── STATUS ──
 function getStatus(ref) {
   var a = approvals[ref] || {}; var v1 = a.A1; var v2 = a.A2;
+  if (a.deleted) return 'deleted';
   if (a.close) return a.close;
   if (a.superseded) return 'superseded';
   if (v1 === 'rejected' || v2 === 'rejected') return 'rejected';
@@ -2572,7 +2583,7 @@ function freightCells_(d) {
 }
 
 function badge(status) {
-  var m = { pending:['badge-pending','รออนุมัติ'], approved:['badge-approved','อนุมัติครบ — รอปิดการขาย'], rejected:['badge-rejected','ปฏิเสธ'], partial:['badge-partial','Approve 1 แล้ว'], 'closed-won':['badge-approved','ปิดการขายได้'], 'closed-lost':['badge-lost','ไม่ปิดการขาย'], 'not-offered':['badge-notoffer','ไม่เสนอ'], 'superseded':['badge-partial','bidding'], 'question':['badge-question','มีคำถาม'] };
+  var m = { pending:['badge-pending','รออนุมัติ'], approved:['badge-approved','อนุมัติครบ — รอปิดการขาย'], rejected:['badge-rejected','ปฏิเสธ'], partial:['badge-partial','Approve 1 แล้ว'], 'closed-won':['badge-approved','ปิดการขายได้'], 'closed-lost':['badge-lost','ไม่ปิดการขาย'], 'not-offered':['badge-notoffer','ไม่เสนอ'], 'deleted':['badge-deleted','ลบแล้ว'], 'superseded':['badge-partial','bidding'], 'question':['badge-question','มีคำถาม'] };
   var s = m[status] || m.pending;
   return '<span class="status-badge ' + s[0] + '">' + s[1] + '</span>';
 }
@@ -2854,6 +2865,29 @@ function closeSale(ref, result) {
   showToast(doneMsg[result] || 'บันทึกแล้ว', result === 'closed-won' ? 'green' : 'red');
   renderCards();
 }
+/* ── ลบใบที่ถูกปฏิเสธ (ซ่อนจากหน้าจอ แถวยังอยู่ในชีท) ── */
+function deleteOffer(ref) {
+  if (getStatus(ref) !== 'rejected') {
+    showToast('ลบได้เฉพาะใบที่ถูกปฏิเสธ', 'red');
+    return;
+  }
+  if (!confirm('ซ่อนใบ ' + ref + ' ออกจากหน้าจอ?\n\nข้อมูลยังอยู่ในชีท กู้คืนได้จากถังขยะ')) return;
+  if (!approvals[ref]) approvals[ref] = {};
+  approvals[ref].deleted = true;
+  postSaleState(ref, 'deleted|' + todayISO());
+  showToast('ย้ายไปถังขยะแล้ว — กู้คืนได้จากปุ่มกรอง "ถังขยะ"');
+  renderCards();
+}
+
+function restoreOffer(ref) {
+  var a = approvals[ref] || {};
+  if (!a.deleted) return;
+  delete a.deleted;
+  postSaleState(ref, 'rejected');
+  showToast('กู้คืนแล้ว — กลับไปอยู่ในรายการที่ปฏิเสธ', 'green');
+  renderCards();
+}
+
 function undoClose(ref) {
   if (approvals[ref]) {
     delete approvals[ref].close;
@@ -2936,7 +2970,8 @@ function renderCards() {
     data = DATA.filter(function(d) {
       var st = getStatus(d.ref);
       return st === 'approved' || st === 'closed-won' || st === 'closed-lost' ||
-             st === 'not-offered' || st === 'rejected' || st === 'superseded' || st === 'question';
+             st === 'not-offered' || st === 'rejected' || st === 'superseded' ||
+             st === 'question' || st === 'deleted';
     });
   }
   var filt = (curFilter === 'ext-pending')
@@ -2944,7 +2979,8 @@ function renderCards() {
     : data.filter(function(d){ return getStatus(d.ref) === curFilter; });
 
   var cnt = function(st){ return data.filter(function(d){ return getStatus(d.ref) === st; }).length; };
-  document.getElementById('st-total').textContent = data.length;
+  var live = data.filter(function(d){ return getStatus(d.ref) !== 'deleted'; });
+  document.getElementById('st-total').textContent = live.length;
   if (window._statusMode) {
     document.getElementById('st-total').textContent = cnt('approved');
     document.getElementById('st-pend').textContent  = cnt('closed-won');
@@ -2955,7 +2991,8 @@ function renderCards() {
     document.getElementById('st-appr').textContent = cnt('approved');
     document.getElementById('st-rej').textContent  = cnt('rejected');
   }
-  document.getElementById('sec-count').textContent = 'แสดง ' + filt.length + ' จาก ' + data.length + ' รายการ';
+  var totalShown = (curFilter === 'deleted') ? data.length : live.length;
+  document.getElementById('sec-count').textContent = 'แสดง ' + filt.length + ' จาก ' + totalShown + ' รายการ';
 
   updateFilterCounts_(data);
 
@@ -3074,9 +3111,22 @@ function renderCards() {
           '<div class="slot-divider"></div>' +
           slotHtml('A2', dec2) +
         '</div>' +
+        (status === 'rejected'
+          ? '<div class="vote-buttons" style="margin-top:14px">' +
+              '<button class="vote-btn btn-trash" onclick="deleteOffer(\'' + d.ref + '\')" title="ซ่อนใบนี้ออกจากหน้าจอ กู้คืนได้">ลบใบนี้</button>' +
+            '</div>'
+          : '') +
       '</div>';
     }
-    if (window._statusMode && status === 'question') {
+    if (status === 'deleted') {
+      approveHtml = '<div class="approve-section"><div class="vote-slot-wrap" style="padding-left:0">' +
+        '<div class="slot-label">อยู่ในถังขยะ</div>' +
+        '<div class="vote-result deleted">ซ่อนจากรายการปกติแล้ว' +
+          '<button class="btn-undo" onclick="restoreOffer(\'' + d.ref + '\')">กู้คืน</button></div>' +
+        '<div class="trash-note">ข้อมูลยังอยู่ในชีทครบ ไม่ได้ถูกลบถาวร</div>' +
+      '</div></div>';
+    }
+    else if (window._statusMode && status === 'question') {
       var qWho = av.question, qTxt = (qWho === 'A1' ? av.remarkA1 : av.remarkA2) || '';
       approveHtml = '<div class="approve-section"><div class="vote-slot-wrap" style="padding-left:0">' +
         '<div class="slot-label">ผู้อนุมัติมีคำถาม (' + qWho + ')</div>' +
@@ -3101,7 +3151,10 @@ function renderCards() {
         '<div class="vote-result rejected">ถูกปฏิเสธโดย ' + (who.join(' และ ') || 'ผู้อนุมัติ') + '</div>' +
         (reasons ? '<div class="rej-reasons">' + reasons + '</div>'
                  : '<div class="close-remark-note">ผู้อนุมัติไม่ได้ระบุเหตุผลไว้</div>') +
-        '<button class="vote-btn btn-revise" style="margin-top:12px" onclick="reviseOffer(\'' + d.ref + '\')">แก้ไขและส่งใหม่</button>' +
+        '<div class="vote-buttons" style="margin-top:12px">' +
+          '<button class="vote-btn btn-revise" onclick="reviseOffer(\'' + d.ref + '\')">แก้ไขและส่งใหม่</button>' +
+          '<button class="vote-btn btn-trash" onclick="deleteOffer(\'' + d.ref + '\')" title="ซ่อนใบนี้ออกจากหน้าจอ กู้คืนได้">ลบใบนี้</button>' +
+        '</div>' +
       '</div></div>';
     }
     else if (window._statusMode && (status === 'approved' || status === 'closed-won' || status === 'closed-lost' || status === 'not-offered')) {
@@ -3348,7 +3401,7 @@ function updateFilterCounts_(data) {
     'filter-pending': 'pending', 'filter-partial': 'partial', 'filter-approved': 'approved',
     'filter-rejected': 'rejected', 'filter-closed-won': 'closed-won',
     'filter-closed-lost': 'closed-lost', 'filter-not-offered': 'not-offered',
-    'filter-superseded': 'superseded',
+    'filter-superseded': 'superseded', 'filter-deleted': 'deleted',
     'filter-question': 'question'
   };
   var count = function(st){ return data.filter(function(d){ return getStatus(d.ref) === st; }).length; };
