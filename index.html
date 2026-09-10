@@ -1626,7 +1626,7 @@ function addProduct(data) {
       '<div class="field"><label>Idea Price (USD/MT or THB/KG)</label>' +
         '<input class="pp-idea" type="text" value="' + (data.idea||'') + '"></div>' +
       '<div class="field"><label>%Margin (Idea)</label>' +
-        '<input class="pp-margin" type="text" value="' + (data.margin||'') + '"></div>' +
+        '<input class="pp-margin" type="text" placeholder="เช่น 45 (ไม่ต้องใส่ %)" value="' + (data.margin||'') + '"></div>' +
     '</div>' +
 
     /* ── Offer ── */
@@ -1641,7 +1641,7 @@ function addProduct(data) {
         '<span class="lbl-idea">ราคาที่ให้เป็นไอเดีย (USD/MT)</span></label>' +
         '<input class="pp-offer-price" type="text" placeholder="เช่น $3,625" value="' + (data.offerPrice||'') + '" oninput="calcFreight(this)"></div>' +
       '<div class="field"><label>%Margin (Offer)</label>' +
-        '<input class="pp-offer-margin" type="text" placeholder="เช่น 48.6%" value="' + (data.offerMargin||'') + '"></div>' +
+        '<input class="pp-offer-margin" type="text" placeholder="เช่น 48.6 (ไม่ต้องใส่ %)" value="' + (data.offerMargin||'') + '"></div>' +
     '</div>' +
     '<div class="g3" style="margin-bottom:10px">' +
       '<div class="field"><label>Quantity per Month (MT)</label>' +
@@ -1730,6 +1730,14 @@ function calcFreight(el) {
   box.style.display = 'block';
 }
 
+/* Google Sheets อ่าน "25.33%" เป็นตัวเลข 0.2533 แล้วคืนค่ามาแบบนั้น ทำให้การ์ดขึ้น "0.2533%"
+   ตัด % ออกก่อนส่งเมื่อค่าเป็นตัวเลขล้วน ชีทจะได้เก็บ 25.33 ตรง ๆ
+   ค่าที่เป็นข้อความอิสระ เช่น "11% (-3% เทียบ BLK)" ไม่แตะ เพราะชีทเก็บเป็นข้อความอยู่แล้ว */
+function pctPlain_(v) {
+  var t = String(v || '').trim();
+  return /^-?[\d,]*\.?\d+\s*%$/.test(t) ? t.replace(/\s*%$/, '').trim() : t;
+}
+
 function getProdData() {
   var out = [];
   document.querySelectorAll('.prod-block').forEach(function(b) {
@@ -1739,7 +1747,7 @@ function getProdData() {
       qty:        (b.querySelector('.pp-qty')         ||{}).value||'',
       months:     (b.querySelector('.pp-months')      ||{}).value||'',
       idea:       (b.querySelector('.pp-idea')        ||{}).value||'',
-      margin:     (b.querySelector('.pp-margin')      ||{}).value||'',
+      margin:     pctPlain_((b.querySelector('.pp-margin')      ||{}).value||''),
       allocation: (b.querySelector('.pp-allocation')  ||{}).value||'',
       lastClosed: (b.querySelector('.pp-last-closed') ||{}).value||'',
       lastOffer:  (b.querySelector('.pp-last-offer')  ||{}).value||'',
@@ -1747,7 +1755,7 @@ function getProdData() {
       other:      (b.querySelector('.pp-other')       ||{}).value||'',
       period:     (b.querySelector('.pp-period')      ||{}).value||'',
       offerPrice: (b.querySelector('.pp-offer-price') ||{}).value||'',
-      offerMargin:(b.querySelector('.pp-offer-margin')||{}).value||'',
+      offerMargin:pctPlain_((b.querySelector('.pp-offer-margin')||{}).value||''),
       qtyMonth:   (b.querySelector('.pp-qty-month')   ||{}).value||'',
       offerDate:  (b.querySelector('.pp-offer-date')  ||{}).value||'',
       valid:      (b.querySelector('.pp-valid')       ||{}).value||'',
@@ -2569,8 +2577,35 @@ function badge(status) {
   return '<span class="status-badge ' + s[0] + '">' + s[1] + '</span>';
 }
 
+/* %Margin ในชีทมี 3 แบบปนกัน เพราะช่องกรอกเป็น free text
+   "25.34"  → ตัวเลขหน่วย % ตรง ๆ
+   "0.2533" → Google Sheets แปลง "25.33%" ที่พิมพ์มาเป็นเศษส่วนแล้วคืนค่ามาแบบนี้ ต้องคูณ 100
+   "11% (-3% เทียบ BLK)" / "x" → ข้อความอิสระ แสดงตามที่พิมพ์ ห้ามเติม % ต่อท้าย
+   คืน NaN เมื่อไม่ใช่ตัวเลขล้วน */
+function mgNum_(m) {
+  var t = String(m == null ? '' : m).trim().replace(/,/g, '');
+  if (!t) return NaN;
+  var hadPct = /%$/.test(t);
+  if (hadPct) t = t.slice(0, -1).trim();
+  if (!/^-?\d*\.?\d+$/.test(t)) return NaN;   // มีตัวอักษรอื่นปน = ข้อความอิสระ
+  var n = parseFloat(t);
+  if (isNaN(n)) return NaN;
+  // ไม่มี % ต่อท้ายและค่าต่ำกว่า 1 = เศษส่วนจากชีท (margin จริงของสินค้ากลุ่มนี้อยู่หลัก 10-50%)
+  if (!hadPct && n > 0 && n < 1) n = n * 100;
+  return n;
+}
+
+/* แสดง %Margin ให้อ่านรู้เรื่องไม่ว่าค่าจะมาแบบไหน */
+function fmtMargin_(m) {
+  var raw = String(m == null ? '' : m).trim();
+  if (!raw) return '—';
+  var n = mgNum_(raw);
+  if (isNaN(n)) return raw;                      // ข้อความอิสระ ปล่อยตามเดิม
+  return (Math.round(n * 100) / 100) + '%';
+}
+
 function mgClass(m) {
-  var n = parseFloat(m);
+  var n = mgNum_(m);
   if (isNaN(n)) return '';
   if (n >= 35) return 'mg-h';
   if (n >= 20) return 'mg-m';
@@ -2943,7 +2978,7 @@ function renderCards() {
         '<td style="color:#555">' + (p.qty || '—') + '</td>' +
         '<td style="color:#555">' + (p.months || '—') + '</td>' +
         '<td><span class="pv">' + (p.ideaPrice || '—') + '</span></td>' +
-        '<td><span class="mg ' + mc + '">' + (p.marginIdea || d.offerMargin || '—') + (p.marginIdea || d.offerMargin ? '%' : '') + '</span></td>' +
+        '<td><span class="mg ' + mc + '">' + fmtMargin_(p.marginIdea || d.offerMargin) + '</span></td>' +
         '</tr>';
     });
 
@@ -2963,7 +2998,7 @@ function renderCards() {
       offerDetail = '<div class="offer-detail">' +
         (d.period ? '<div class="detail-cell"><div class="dl">Shipment ที่เสนอ</div><div class="dv">' + d.period + '</div></div>' : '') +
         (d.offerPrice ? '<div class="detail-cell"><div class="dl">' + (d.offerKind === 'idea' ? 'ไอเดียราคา' : 'ราคาเสนอ') + '</div><div class="dv dv-red">$' + d.offerPrice + '/MT</div></div>' : '') +
-        (d.offerMargin ? '<div class="detail-cell"><div class="dl">%Margin</div><div class="dv ' + (mgClass(d.offerMargin) === 'mg-h' ? 'dv-green' : mgClass(d.offerMargin) === 'mg-l' ? 'dv-red' : '') + '">' + d.offerMargin + '%</div></div>' : '') +
+        (d.offerMargin ? '<div class="detail-cell"><div class="dl">%Margin</div><div class="dv ' + (mgClass(d.offerMargin) === 'mg-h' ? 'dv-green' : mgClass(d.offerMargin) === 'mg-l' ? 'dv-red' : '') + '">' + fmtMargin_(d.offerMargin) + '</div></div>' : '') +
         (d.qtyMonth ? '<div class="detail-cell"><div class="dl">Qty/Month</div><div class="dv">' + d.qtyMonth + '</div></div>' : '') +
         (d.offerDate && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Date ที่จะเสนอ</div><div class="dv">' + d.offerDate + '</div></div>' : '') +
         (d.valid && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Valid</div><div class="dv">' + d.valid + '</div></div>' : '') +
@@ -3075,7 +3110,8 @@ function renderCards() {
         var inputs = CLOSE_FIELDS.map(function(f) {
           return '<div class="close-field"><label>' + f.label + '</label>' +
             '<input id="' + f.id + '-' + d.ref + '" class="close-input" type="text" placeholder="' +
-            (d[f.from] ? 'เสนอไว้ ' + d[f.from] : '—') + '" value="' + (av[f.key] || '') + '"></div>';
+            (d[f.from] ? 'เสนอไว้ ' + (f.key === 'closeMargin' ? fmtMargin_(d[f.from]) : d[f.from]) : '—') +
+            '" value="' + (av[f.key] || '') + '"></div>';
         }).join('');
         closeInner = '<div class="close-field close-date-wrap"><label>วันที่ปิดการขาย</label>' +
           dateInput('close-date-' + d.ref, av.closeDate || todayISO()) + '</div>' +
