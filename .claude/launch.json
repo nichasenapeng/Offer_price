@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "offer-form", "runtimeExecutable": "sh", "runtimeArgs": ["-c", "python3 -m http.server $PORT"], "port": 8899, "autoPort": true }
+  ]
+}

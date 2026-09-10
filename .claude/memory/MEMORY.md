@@ -1,0 +1,2 @@
+- [Deploy both, only on request](deploy-both-on-request.md) — publish to GitHub Pages *and* Cloudflare, but wait to be told
+- [Cloudflare & GitHub deploy setup](cloudflare-deploy-setup.md) — nicha's accounts, wrangler command, and the gh identity switch
