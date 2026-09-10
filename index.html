@@ -943,6 +943,16 @@ body::before, body::after { display: none !important; }
   #approve-app .prod-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
 
+/* ── สถานะ "มีคำถาม" ── */
+.badge-question{background:#FEF3C7;color:#8a5a08;border:1px solid #f0c76b}
+#approve-app .btn-ask{background:rgba(254,243,199,0.9);color:#8a5a08;border:1.5px solid #f0c76b}
+#approve-app .btn-ask:hover{background:#8a5a08;color:#fff;border-color:#8a5a08;transform:translateY(-1px)}
+#approve-app .q-box{flex:1 0 100%;width:100%;margin-bottom:16px;padding:14px 18px;background:rgba(254,249,231,0.75);border:1.5px solid #d99a2b;border-radius:var(--radius-sm)}
+#approve-app .q-text{margin-top:6px;font-size:14px;color:var(--ink);line-height:1.6;white-space:pre-line}
+#approve-app .q-reply{margin-top:10px;padding:9px 13px;background:rgba(230,247,240,0.8);border:1px solid #a7f3d0;border-radius:var(--radius-sm);font-size:13px;color:var(--ink-soft);line-height:1.6;white-space:pre-line}
+#approve-app .q-reply span{display:block;font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+#approve-app .q-wait{margin-top:8px;font-size:12px;color:#8a5a08;font-style:italic}
+
 /* ══════════ AUDIT FIXES: motion · focus · z-index · touch ══════════ */
 
 /* ลำดับชั้นแบบมีความหมาย แทนเลขสุ่ม (999/1000) */
@@ -1327,6 +1337,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
   <button class="filter-btn" id="filter-closed-won" onclick="setFilter('closed-won',this)">ปิดการขายได้</button>
   <button class="filter-btn" id="filter-closed-lost" onclick="setFilter('closed-lost',this)">ไม่ปิดการขาย</button>
   <button class="filter-btn" id="filter-superseded" onclick="setFilter('superseded',this)">bidding</button>
+  <button class="filter-btn" id="filter-question" onclick="setFilter('question',this)">มีคำถาม</button>
   <button class="filter-btn" id="filter-ext" onclick="setFilter('ext-pending',this)">ขอขยาย VALID</button>
 </div>
 
@@ -2069,6 +2080,7 @@ function demoApprovals() {
     'SFD-2026-0101': {},
     'SFD-2026-0102': {},
     'SFD-2026-0103': { A1:'approved', remarkA1:'ราคาโอเค แต่รอเช็คสต็อก skin' },
+    'SFD-2026-0102': { A1:'approved', remarkA1:'ลูกค้าขอ bidding 4175 — ถ้าเขาซื้อจากเราเจ้าเดียว ลดให้อีกได้ไหมครับ?', question:'A1' },
     'SFD-2026-0104': { A1:'approved', A2:'approved', remarkA1:'อนุมัติ', remarkA2:'ลูกค้าใหม่ ให้ลองดู' },
     'SFD-2026-0105': { A1:'approved', A2:'approved' },
     'SFD-2026-0106': { A1:'approved', A2:'approved', close:'closed-won', closeShipment:'Nov/Dec 2026', closeQty:'48 MT / 2 FCL', closePrice:'3,300', closeMargin:'41.2%', closeRemark:'ลูกค้าตกลงตามราคาเสนอ ขอเลื่อน shipment เป็นต้นเดือน', closeDate:'2026-09-05' },
@@ -2132,6 +2144,10 @@ function loadData() {
             approvals[d.ref].extState  = ov[0].slice(4);   // pending | approved | rejected
             approvals[d.ref].extValid  = ov[1] || '';
             approvals[d.ref].extReason = ov[2] || '';
+          }
+          if (ov[0] === 'question') {
+            approvals[d.ref].question = ov[1] || 'A1';       // ใครถาม
+            if (ov[2]) approvals[d.ref].questionReply = ov[2]; // ทีมขายตอบกลับ
           }
           if (ov[0] === 'superseded') {
             approvals[d.ref].superseded = true;
@@ -2393,8 +2409,9 @@ function getStatus(ref) {
   var a = approvals[ref] || {}; var v1 = a.A1; var v2 = a.A2;
   if (a.close) return a.close;
   if (a.superseded) return 'superseded';
-  if (!v1 && !v2) return 'pending';
   if (v1 === 'rejected' || v2 === 'rejected') return 'rejected';
+  if (a.question) return 'question';   // ค้างคำถาม ยังปิดการขายไม่ได้
+  if (!v1 && !v2) return 'pending';
   if (v1 === 'approved' && v2 === 'approved') return 'approved';
   if (v1 || v2) return 'partial';
   return 'pending';
@@ -2419,7 +2436,7 @@ function freightCells_(d) {
 }
 
 function badge(status) {
-  var m = { pending:['badge-pending','รออนุมัติ'], approved:['badge-approved','อนุมัติครบ — รอปิดการขาย'], rejected:['badge-rejected','ปฏิเสธ'], partial:['badge-partial','Approve 1 แล้ว'], 'closed-won':['badge-approved','ปิดการขายได้'], 'closed-lost':['badge-lost','ไม่ปิดการขาย'], 'superseded':['badge-partial','bidding'] };
+  var m = { pending:['badge-pending','รออนุมัติ'], approved:['badge-approved','อนุมัติครบ — รอปิดการขาย'], rejected:['badge-rejected','ปฏิเสธ'], partial:['badge-partial','Approve 1 แล้ว'], 'closed-won':['badge-approved','ปิดการขายได้'], 'closed-lost':['badge-lost','ไม่ปิดการขาย'], 'superseded':['badge-partial','bidding'], 'question':['badge-question','มีคำถาม'] };
   var s = m[status] || m.pending;
   return '<span class="status-badge ' + s[0] + '">' + s[1] + '</span>';
 }
@@ -2446,6 +2463,34 @@ function postSaleState(ref, statusVal) {
   };
   fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) }).catch(function(){});
 }
+/* ── ผู้อนุมัติมีคำถาม → ทีมขายตอบ → กลับมาเคาะใหม่ ── */
+function askQuestion(ref, slot) {
+  var el = document.getElementById('rem-' + slot + '-' + ref);
+  var q = el ? el.value.trim() : '';
+  if (!q) {
+    showToast('พิมพ์คำถามในช่องหมายเหตุ ' + slot + ' ก่อนกดส่ง', 'red');
+    if (el) el.focus();
+    return;
+  }
+  if (!approvals[ref]) approvals[ref] = {};
+  approvals[ref][slot === 'A1' ? 'remarkA1' : 'remarkA2'] = q;
+  approvals[ref].question = slot;
+  delete approvals[ref].questionReply;
+  postSaleState(ref, 'question|' + slot);
+  showToast('ส่งคำถามให้ทีมขายแล้ว — ใบนี้ยังไม่ถูกอนุมัติ', 'green');
+  renderCards();
+}
+function replyQuestion(ref) {
+  var el = document.getElementById('qreply-' + ref);
+  var a = el ? el.value.trim().replace(/\|/g, ' ') : '';
+  if (!a) { showToast('พิมพ์คำตอบก่อนกดส่ง', 'red'); if (el) el.focus(); return; }
+  if (!approvals[ref]) approvals[ref] = {};
+  approvals[ref].questionReply = a;
+  postSaleState(ref, 'question|' + (approvals[ref].question || 'A1') + '|' + a);
+  showToast('ส่งคำตอบให้ผู้อนุมัติแล้ว', 'green');
+  renderCards();
+}
+
 /* ── ลูกค้าขอขยาย VALID (ไม่ออกใบใหม่ — ให้ผู้อนุมัติยืนยันวันใหม่ในใบเดิม) ── */
 function toggleExtForm(ref) {
   var el = document.getElementById('ext-form-' + ref);
@@ -2648,6 +2693,9 @@ function vote(ref, slot, dec) {
   if (!curKey) { showToast('กรุณาเข้าสู่ระบบก่อน'); return; }
   if (!approvals[ref]) approvals[ref] = {};
   approvals[ref][slot] = dec;
+  // ตัดสินใจแล้ว = คำถามจบ
+  delete approvals[ref].question;
+  delete approvals[ref].questionReply;
 
   // หาข้อมูล card นี้
   var d = DATA.filter(function(x){ return x.ref === ref; })[0] || {};
@@ -2709,7 +2757,8 @@ function renderCards() {
     // โหมดเช็คสถานะ: เห็นเฉพาะใบที่ผู้อนุมัติตัดสินแล้ว (อนุมัติครบ / ปิดการขาย / ถูกปฏิเสธ)
     data = DATA.filter(function(d) {
       var st = getStatus(d.ref);
-      return st === 'approved' || st === 'closed-won' || st === 'closed-lost' || st === 'rejected' || st === 'superseded';
+      return st === 'approved' || st === 'closed-won' || st === 'closed-lost' ||
+             st === 'rejected' || st === 'superseded' || st === 'question';
     });
   }
   var filt = (curFilter === 'ext-pending')
@@ -2798,6 +2847,7 @@ function renderCards() {
           voteArea = '<div class="vote-buttons">' +
             '<button class="vote-btn btn-approve" onclick="vote(\'' + d.ref + '\',\'' + slot + '\',\'approved\')">Approve</button>' +
             '<button class="vote-btn btn-reject"  onclick="vote(\'' + d.ref + '\',\'' + slot + '\',\'rejected\')">Reject</button>' +
+            '<button class="vote-btn btn-ask" onclick="askQuestion(\'' + d.ref + '\',\'' + slot + '\')" title="ส่งคำถามให้ทีมขาย โดยยังไม่อนุมัติ">มีคำถาม</button>' +
           '</div>';
         }
         return '<div class="vote-slot-wrap">' +
@@ -2808,6 +2858,17 @@ function renderCards() {
         '</div>';
       }
 
+      var qBox = '';
+      if (av.question) {
+        var qWho = av.question, qTxt = (qWho === 'A1' ? av.remarkA1 : av.remarkA2) || '';
+        qBox = '<div class="q-box">' +
+          '<div class="slot-label">คำถามถึงทีมขาย (' + qWho + ') — ใบนี้ยังไม่ถูกอนุมัติ</div>' +
+          (qTxt ? '<div class="q-text">' + qTxt + '</div>' : '') +
+          (av.questionReply
+            ? '<div class="q-reply"><span>ทีมขายตอบ</span>' + av.questionReply + '</div>'
+            : '<div class="q-wait">รอทีมขายตอบกลับ</div>') +
+        '</div>';
+      }
       var extDecide = '';
       if (av.extState === 'pending') {
         extDecide = '<div class="ext-decide">' +
@@ -2822,7 +2883,7 @@ function renderCards() {
         extDecide = '<div class="ext-note ok"><b>ขยาย VALID แล้ว</b> — ยืนราคาถึง <b>' + av.extValid + '</b></div>';
       }
       approveHtml = '<div class="approve-section">' +
-        extDecide +
+        qBox + extDecide +
         '<div class="approve-slots">' +
           slotHtml('A1', dec1) +
           '<div class="slot-divider"></div>' +
@@ -2830,7 +2891,20 @@ function renderCards() {
         '</div>' +
       '</div>';
     }
-    if (window._statusMode && status === 'rejected') {
+    if (window._statusMode && status === 'question') {
+      var qWho = av.question, qTxt = (qWho === 'A1' ? av.remarkA1 : av.remarkA2) || '';
+      approveHtml = '<div class="approve-section"><div class="vote-slot-wrap" style="padding-left:0">' +
+        '<div class="slot-label">ผู้อนุมัติมีคำถาม (' + qWho + ')</div>' +
+        (qTxt ? '<div class="q-text">' + qTxt + '</div>' : '') +
+        (av.questionReply
+          ? '<div class="q-reply"><span>คำตอบที่ส่งไปแล้ว</span>' + av.questionReply + '</div>' +
+            '<div class="q-wait">รอผู้อนุมัติพิจารณาอีกครั้ง</div>'
+          : '<div class="close-field" style="margin-top:12px"><label>ตอบคำถาม</label>' +
+            '<textarea id="qreply-' + d.ref + '" class="close-input close-remark" rows="2" placeholder="ตอบคำถามของผู้อนุมัติ แล้วใบนี้จะกลับไปให้เคาะอีกครั้ง"></textarea></div>' +
+            '<button class="vote-btn btn-approve" style="margin-top:10px" onclick="replyQuestion(\'' + d.ref + '\')">ส่งคำตอบ</button>') +
+      '</div></div>';
+    }
+    else if (window._statusMode && status === 'rejected') {
       var who = [];
       if (av.A1 === 'rejected') who.push('Approve 1');
       if (av.A2 === 'rejected') who.push('Approve 2');
@@ -3070,11 +3144,14 @@ function updateFilterCounts_(data) {
   var map = {
     'filter-pending': 'pending', 'filter-partial': 'partial', 'filter-approved': 'approved',
     'filter-rejected': 'rejected', 'filter-closed-won': 'closed-won',
-    'filter-closed-lost': 'closed-lost', 'filter-superseded': 'superseded'
+    'filter-closed-lost': 'closed-lost', 'filter-superseded': 'superseded',
+    'filter-question': 'question'
   };
   var count = function(st){ return data.filter(function(d){ return getStatus(d.ref) === st; }).length; };
   // สถานะที่ยังต้องมีคนลงมือ — เน้นสีให้เห็น
-  var needsAction = window._statusMode ? {'approved':1} : {'pending':1, 'partial':1};
+  var needsAction = window._statusMode
+    ? {'approved':1, 'question':1}     // เซลส์: ตามปิดการขาย + ตอบคำถาม
+    : {'pending':1, 'partial':1, 'question':1};  // ผู้อนุมัติ: เคาะ + คำถามที่ตอบกลับมาแล้ว
 
   var paint = function(b, n, urgent) {
     if (!b) return;
@@ -3101,14 +3178,16 @@ function updateFilterCounts_(data) {
   if (pill) {
     var total, label;
     if (window._summaryMode) { total = 0; }
-    else if (window._statusMode) { total = count('approved'); label = 'รอปิดการขาย'; }
-    else { total = count('pending') + count('partial') + extN; label = 'รอคุณดำเนินการ'; }
+    else if (window._statusMode) { total = count('approved') + count('question'); label = 'รอคุณดำเนินการ'; }
+    else { total = count('pending') + count('partial') + count('question') + extN; label = 'รอคุณดำเนินการ'; }
     pill.style.display = total ? 'inline-flex' : 'none';
     pill.innerHTML = '<span class="notif-dot"></span>' + label + ' <b>' + total + '</b>';
   }
 }
 function jumpToPending() {
-  var order = window._statusMode ? ['filter-approved'] : ['filter-pending', 'filter-partial', 'filter-ext'];
+  var order = window._statusMode
+    ? ['filter-question', 'filter-approved']
+    : ['filter-pending', 'filter-partial', 'filter-question', 'filter-ext'];
   for (var i = 0; i < order.length; i++) {
     var b = document.getElementById(order[i]);
     if (b && b.classList.contains('has-pending')) { b.click(); return; }
