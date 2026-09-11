@@ -2673,7 +2673,7 @@ function priceFromRemark_(txt) {
   var m, best = '';
   while ((m = re.exec(t)) !== null) {
     var n = parseFloat(m[1].replace(/,/g, ''));
-    if (n >= 100 && n <= 999999) best = String(n);
+    if (n >= 500 && n <= 999999) best = String(n);
   }
   return best;
 }
@@ -2688,27 +2688,43 @@ function unsavedPriceHint_(ref, d) {
   return hint;
 }
 
+function fmtPrice_(v) {
+  var t = String(v == null ? '' : v).trim();
+  if (!t) return '';
+  return /^[\d.,]+$/.test(t) ? '$' + t + '/MT' : t;
+}
+
 /* กล่องบอกราคาที่อนุมัติ — ขึ้นเมื่อมีผู้อนุมัติกรอกราคาไว้อย่างน้อยหนึ่งคน */
 function apPriceBox_(d) {
   var a = approvals[d.ref] || {};
+  // ยังไม่มีใครอนุมัติ ก็ยังไม่มีราคาที่อนุมัติให้พูดถึง
+  if (a.A1 !== 'approved' && a.A2 !== 'approved') return '';
   var p1 = a.apPriceA1 || '', p2 = a.apPriceA2 || '';
+
   if (!p1 && !p2) {
+    // ไม่ได้บันทึกราคาไว้ แต่หมายเหตุมีตัวเลขที่ดูเหมือนราคาอื่น — เตือนก่อนปิดการขาย
     var hint = unsavedPriceHint_(d.ref, d);
-    if (!hint) return '';
-    return '<div class="ap-price-box warn">' +
-      'หมายเหตุผู้อนุมัติระบุราคา <b>' + hint + '</b> แต่ยังไม่ได้บันทึกเป็นราคาที่อนุมัติ ' +
-      '— ระบบยังยึด <b>' + (d.offerPrice || '—') + '</b> อยู่' +
-      '<div class="ap-price-split">' + (window._statusMode
-        ? 'ให้ผู้อนุมัติเปิดหน้า Approve แล้วกดปุ่ม "ใช้ ' + hint + ' จากหมายเหตุ" ก่อนปิดการขาย'
-        : 'กดปุ่ม "ใช้ ' + hint + ' จากหมายเหตุ" ในช่องด้านบนเพื่อบันทึก') + '</div>' +
-    '</div>';
+    if (hint) {
+      return '<div class="ap-price-box warn">' +
+        'หมายเหตุผู้อนุมัติระบุราคา <b>' + hint + '</b> แต่ยังไม่ได้บันทึกเป็นราคาที่อนุมัติ ' +
+        '— ระบบยังยึด <b>' + (d.offerPrice || '—') + '</b> อยู่' +
+        '<div class="ap-price-split">' + (window._statusMode
+          ? 'ให้ผู้อนุมัติเปิดหน้า Approve แล้วกดปุ่ม "ใช้ ' + hint + ' จากหมายเหตุ" ก่อนปิดการขาย'
+          : 'กดปุ่ม "ใช้ ' + hint + ' จากหมายเหตุ" ในช่องด้านบนเพื่อบันทึก') + '</div>' +
+      '</div>';
+    }
+    // เคลียร์ทุกอย่าง = อนุมัติตามราคาที่ทีมขายเสนอมา บอกให้ชัดว่าเคาะแล้ว
+    if (!d.offerPrice) return '';
+    return '<div class="ap-price-box">อนุมัติตามราคาที่เสนอ: <b>' + fmtPrice_(d.offerPrice) + '</b></div>';
   }
+
   var used = approvedPrice_(d.ref, d);
   var clash = p1 && p2 && numOf(p1) !== numOf(p2);
+  var same  = d.offerPrice && numOf(used) === numOf(d.offerPrice);
   return '<div class="ap-price-box' + (clash ? ' clash' : '') + '">' +
     (clash ? 'ผู้อนุมัติเคาะราคาไม่ตรงกัน — ' : '') +
-    'ราคาที่อนุมัติ: <b>$' + used + '/MT</b>' +
-    (d.offerPrice && numOf(used) !== numOf(d.offerPrice) ? ' (ทีมขายเสนอมา ' + d.offerPrice + ')' : '') +
+    'ราคาที่อนุมัติ: <b>' + fmtPrice_(used) + '</b>' +
+    (same ? ' (เท่ากับที่เสนอ)' : (d.offerPrice ? ' (ทีมขายเสนอมา ' + d.offerPrice + ')' : '')) +
     (clash
       ? '<div class="ap-price-split">Approve 1: ' + p1 + ' &nbsp;·&nbsp; Approve 2: ' + p2 +
         ' &nbsp;— ระบบยึดราคาของ Approve 2</div>'
