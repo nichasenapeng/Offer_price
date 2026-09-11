@@ -730,7 +730,8 @@ body::before, body::after { display: none !important; }
 .vote-result.deleted{background:#f3f4f6;color:#6b7280;border:1px dashed #9ca3af}
 .trash-note{font-size:12px;color:var(--ink-muted);margin-top:8px;line-height:1.6}
 /* ราคาที่ผู้อนุมัติเคาะ */
-.ap-price-field{margin-top:10px}
+.ap-price-field{margin-top:10px;position:relative}
+.ap-price-field .ap-save{margin-top:6px;font-size:11px;padding:5px 12px}
 .ap-price-box{
   margin:12px 0;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;line-height:1.7;
   background:rgba(230,247,240,0.85);border:1px solid #a7f3d0;color:var(--green);
@@ -3021,6 +3022,32 @@ function vote(ref, slot, dec) {
   renderCards();
 }
 
+/* แก้ราคาที่อนุมัติของใบที่โหวตไปแล้ว โดยไม่ต้องยกเลิกโหวต */
+function saveApprovedPrice(ref, slot) {
+  if (!curKey) { showToast('กรุณาเข้าสู่ระบบก่อน'); return; }
+  var st = getStatus(ref);
+  if (['pending', 'partial', 'approved'].indexOf(st) === -1) {
+    showToast('แก้ราคาที่อนุมัติได้เฉพาะก่อนปิดการขาย', 'red');
+    return;
+  }
+  var el = document.getElementById('ap-' + slot + '-' + ref);
+  if (!el) return;
+  if (!approvals[ref]) approvals[ref] = {};
+  var av = approvals[ref];
+  if (!av[slot]) { showToast('ช่องนี้ยังไม่ได้กด Approve', 'red'); return; }
+  var key = slot === 'A1' ? 'apPriceA1' : 'apPriceA2';
+  var v = el.value.trim().replace(/[|\]]/g, ' ');
+  if (v) av[key] = v; else delete av[key];
+  saveRemarks();
+  // สถานะรวมอาจกำลังถือคำขอขยาย VALID อยู่ อย่าเขียนทับให้หาย
+  var statusVal = av.extState
+    ? 'ext-' + av.extState + '|' + (av.extValid || '') + '|' + (av.extReason || '') + '|' + (av.extNote || '')
+    : st;
+  postSaleState(ref, statusVal);
+  showToast(v ? 'บันทึกราคาที่อนุมัติ ' + v + ' แล้ว' : 'ล้างราคาที่อนุมัติแล้ว', 'green');
+  renderCards();
+}
+
 function undoVote(ref, slot) {
   if (approvals[ref]) {
     delete approvals[ref][slot];
@@ -3159,7 +3186,11 @@ function renderCards() {
           '<div class="close-field ap-price-field"><label>ราคาที่อนุมัติ (USD/MT)</label>' +
             '<input id="' + apId + '" class="close-input" type="text" inputmode="decimal"' +
             ' placeholder="' + (d.offerPrice ? 'เสนอมา ' + d.offerPrice + ' — เว้นว่าง = อนุมัติตามนี้' : 'เว้นว่าง = อนุมัติตามราคาที่เสนอ') + '"' +
-            ' value="' + apVal + '"' + (dec ? ' disabled' : '') + '></div>' +
+            ' value="' + apVal + '"' +
+            ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();saveApprovedPrice(\'' + d.ref + '\',\'' + slot + '\')}">' +
+            // โหวตไปแล้วก็ยังแก้ราคาได้ ไม่ต้องยกเลิกโหวตก่อน
+            (dec ? '<button class="btn-undo ap-save" onclick="saveApprovedPrice(\'' + d.ref + '\',\'' + slot + '\')">บันทึกราคา</button>' : '') +
+          '</div>' +
           '<div class="remark-area" style="margin-top:8px"><label>หมายเหตุ ' + label + '</label>' +
           '<textarea id="' + remId + '" placeholder="ความเห็น / เงื่อนไข...">' + remVal + '</textarea></div>' +
         '</div>';
