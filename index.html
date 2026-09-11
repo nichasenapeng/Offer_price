@@ -729,6 +729,15 @@ body::before, body::after { display: none !important; }
 .btn-trash:hover{background:var(--red);color:#fff;border-color:var(--red);border-style:solid}
 .vote-result.deleted{background:#f3f4f6;color:#6b7280;border:1px dashed #9ca3af}
 .trash-note{font-size:12px;color:var(--ink-muted);margin-top:8px;line-height:1.6}
+/* ราคาที่ผู้อนุมัติเคาะ */
+.ap-price-field{margin-top:10px}
+.ap-price-box{
+  margin:12px 0;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;line-height:1.7;
+  background:rgba(230,247,240,0.85);border:1px solid #a7f3d0;color:var(--green);
+}
+.ap-price-box b{font-family:"Kanit",sans-serif}
+.ap-price-box.clash{background:rgba(254,249,231,0.9);border-color:#d99a2b;color:#8a5a08}
+.ap-price-split{margin-top:5px;font-size:12px;opacity:.9}
 .btn-undo{
   font-size:11px;font-weight:500;color:var(--ink-muted);
   background:rgba(0,0,0,.06);border:1px solid var(--border);
@@ -2264,10 +2273,16 @@ function loadData() {
           approvals[d.ref].A1 = d._sheetA1;
         if (!approvals[d.ref].A2 && validVals.indexOf(d._sheetA2) !== -1)
           approvals[d.ref].A2 = d._sheetA2;
-        if (!approvals[d.ref].remarkA1 && d._sheetRemarkA1)
-          approvals[d.ref].remarkA1 = d._sheetRemarkA1;
-        if (!approvals[d.ref].remarkA2 && d._sheetRemarkA2)
-          approvals[d.ref].remarkA2 = d._sheetRemarkA2;
+        if (!approvals[d.ref].remarkA1 && d._sheetRemarkA1) {
+          var ap1 = stripApMeta_(d._sheetRemarkA1);
+          approvals[d.ref].remarkA1 = ap1.text;
+          if (ap1.price) approvals[d.ref].apPriceA1 = ap1.price;
+        }
+        if (!approvals[d.ref].remarkA2 && d._sheetRemarkA2) {
+          var ap2 = stripApMeta_(d._sheetRemarkA2);
+          approvals[d.ref].remarkA2 = ap2.text;
+          if (ap2.price) approvals[d.ref].apPriceA2 = ap2.price;
+        }
         if (!approvals[d.ref].close && d._sheetOverall) {
           var ov = d._sheetOverall.split('|');
           if (ov[0].indexOf('ext-') === 0) {
@@ -2615,6 +2630,53 @@ function fmtMargin_(m) {
   return (Math.round(n * 100) / 100) + '%';
 }
 
+/* ราคาที่ผู้อนุมัติเคาะ อาจไม่เท่าราคาที่ทีมขายเสนอมา ชีทเพิ่มคอลัมน์ไม่ได้
+   จึงฝากไว้ต้นช่อง "หมายเหตุ A1/A2" แบบเดียวกับ meta ในคอลัมน์หมายเหตุ
+   [PRICE: 4050] ความเห็นที่ผู้อนุมัติพิมพ์ */
+function buildApMeta_(price) {
+  var v = String(price || '').trim().replace(/[|\]]/g, ' ');
+  return v ? '[PRICE: ' + v + '] ' : '';
+}
+function stripApMeta_(txt) {
+  var out = { price: '', text: txt || '' };
+  var m = (txt || '').match(/^\s*\[PRICE:\s*([^\]]*)\]\s*/i);
+  if (!m) return out;
+  out.price = (m[1] || '').trim();
+  out.text  = txt.slice(m[0].length);
+  return out;
+}
+
+/* ราคาที่ใช้จริงหลังอนุมัติ — ยึดของ A2 ก่อน ถ้า A2 ไม่ได้กรอกก็ใช้ของ A1
+   ไม่มีใครกรอกเลย = อนุมัติตามราคาที่เสนอมา */
+function approvedPrice_(ref, d) {
+  var a = approvals[ref] || {};
+  return a.apPriceA2 || a.apPriceA1 || (d && d.offerPrice) || '';
+}
+/* ราคาที่อนุมัติต่างจากที่เสนอไว้หรือไม่ */
+function priceChanged_(ref, d) {
+  var ap = approvedPrice_(ref, d);
+  if (!ap || !d || !d.offerPrice) return false;
+  return numOf(ap) !== numOf(d.offerPrice);
+}
+
+/* กล่องบอกราคาที่อนุมัติ — ขึ้นเมื่อมีผู้อนุมัติกรอกราคาไว้อย่างน้อยหนึ่งคน */
+function apPriceBox_(d) {
+  var a = approvals[d.ref] || {};
+  var p1 = a.apPriceA1 || '', p2 = a.apPriceA2 || '';
+  if (!p1 && !p2) return '';
+  var used = approvedPrice_(d.ref, d);
+  var clash = p1 && p2 && numOf(p1) !== numOf(p2);
+  return '<div class="ap-price-box' + (clash ? ' clash' : '') + '">' +
+    (clash ? 'ผู้อนุมัติเคาะราคาไม่ตรงกัน — ' : '') +
+    'ราคาที่อนุมัติ: <b>$' + used + '/MT</b>' +
+    (d.offerPrice && numOf(used) !== numOf(d.offerPrice) ? ' (ทีมขายเสนอมา ' + d.offerPrice + ')' : '') +
+    (clash
+      ? '<div class="ap-price-split">Approve 1: ' + p1 + ' &nbsp;·&nbsp; Approve 2: ' + p2 +
+        ' &nbsp;— ระบบยึดราคาของ Approve 2</div>'
+      : '') +
+  '</div>';
+}
+
 function mgClass(m) {
   var n = mgNum_(m);
   if (isNaN(n)) return '';
@@ -2633,7 +2695,8 @@ function postSaleState(ref, statusVal) {
     offerPrice: d.offerPrice || '', offerMargin: d.offerMargin || '',
     qtyMonth: d.qtyMonth || '', period: d.period || '',
     A1: av.A1 || '', A2: av.A2 || '', status: statusVal,
-    remarkA1: av.remarkA1 || '', remarkA2: av.remarkA2 || ''
+    remarkA1: buildApMeta_(av.apPriceA1) + (av.remarkA1 || ''),
+    remarkA2: buildApMeta_(av.apPriceA2) + (av.remarkA2 || '')
   };
   fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) }).catch(function(){});
 }
@@ -2916,6 +2979,21 @@ function vote(ref, slot, dec) {
   var remA1El = document.getElementById('rem-A1-' + ref);
   var remA2El = document.getElementById('rem-A2-' + ref);
 
+  // ราคาที่ผู้อนุมัติเคาะ — เก็บเฉพาะตอน Approve (Reject/คำถามไม่ต้องมีราคา)
+  var apEl = document.getElementById('ap-' + slot + '-' + ref);
+  var apKey = slot === 'A1' ? 'apPriceA1' : 'apPriceA2';
+  if (dec === 'approved') {
+    var apRaw = apEl ? apEl.value.trim().replace(/[|\]]/g, ' ') : '';
+    if (apRaw) av[apKey] = apRaw; else delete av[apKey];
+  } else {
+    delete av[apKey];
+  }
+  var remA1Txt = remA1El ? remA1El.value : (av.remarkA1 || '');
+  var remA2Txt = remA2El ? remA2El.value : (av.remarkA2 || '');
+  av.remarkA1 = remA1Txt;
+  av.remarkA2 = remA2Txt;
+  status = getStatus(ref);
+
   // ส่งไป Apps Script → บันทึกลง Sheet 2
   var payload = {
     ref:        ref,
@@ -2929,8 +3007,8 @@ function vote(ref, slot, dec) {
     A1:         av.A1 || '',
     A2:         av.A2 || '',
     status:     status,
-    remarkA1:   remA1El ? remA1El.value : (av.remarkA1 || ''),
-    remarkA2:   remA2El ? remA2El.value : (av.remarkA2 || '')
+    remarkA1:   buildApMeta_(av.apPriceA1) + remA1Txt,
+    remarkA2:   buildApMeta_(av.apPriceA2) + remA2Txt
   };
 
   fetch(API_URL, {
@@ -2944,7 +3022,10 @@ function vote(ref, slot, dec) {
 }
 
 function undoVote(ref, slot) {
-  if (approvals[ref]) delete approvals[ref][slot];
+  if (approvals[ref]) {
+    delete approvals[ref][slot];
+    delete approvals[ref][slot === 'A1' ? 'apPriceA1' : 'apPriceA2'];
+  }
   showToast('ยกเลิก ' + slot + ' แล้ว');
   renderCards();
 }
@@ -3034,7 +3115,11 @@ function renderCards() {
     if (d.period || d.offerPrice || d.offerMargin || d.qtyMonth || d.offerDate || d.valid || d.freight) {
       offerDetail = '<div class="offer-detail">' +
         (d.period ? '<div class="detail-cell"><div class="dl">Shipment ที่เสนอ</div><div class="dv">' + d.period + '</div></div>' : '') +
-        (d.offerPrice ? '<div class="detail-cell"><div class="dl">' + (d.offerKind === 'idea' ? 'ไอเดียราคา' : 'ราคาเสนอ') + '</div><div class="dv dv-red">$' + d.offerPrice + '/MT</div></div>' : '') +
+        (d.offerPrice ? '<div class="detail-cell"><div class="dl">' +
+          (priceChanged_(d.ref, d) ? 'ราคาที่อนุมัติ' : (d.offerKind === 'idea' ? 'ไอเดียราคา' : 'ราคาเสนอ')) +
+          '</div><div class="dv dv-red">$' + (priceChanged_(d.ref, d) ? approvedPrice_(d.ref, d) : d.offerPrice) + '/MT' +
+          (priceChanged_(d.ref, d) ? '<div class="dv-sub">เสนอไว้ ' + d.offerPrice + '</div>' : '') +
+          '</div></div>' : '') +
         (d.offerMargin ? '<div class="detail-cell"><div class="dl">%Margin</div><div class="dv ' + (mgClass(d.offerMargin) === 'mg-h' ? 'dv-green' : mgClass(d.offerMargin) === 'mg-l' ? 'dv-red' : '') + '">' + fmtMargin_(d.offerMargin) + '</div></div>' : '') +
         (d.qtyMonth ? '<div class="detail-cell"><div class="dl">Qty/Month</div><div class="dv">' + d.qtyMonth + '</div></div>' : '') +
         (d.offerDate && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Date ที่จะเสนอ</div><div class="dv">' + d.offerDate + '</div></div>' : '') +
@@ -3065,9 +3150,16 @@ function renderCards() {
             '<button class="vote-btn btn-ask" onclick="askQuestion(\'' + d.ref + '\',\'' + slot + '\')" title="ส่งคำถามให้ทีมขาย โดยยังไม่อนุมัติ">มีคำถาม</button>' +
           '</div>';
         }
+        var apKey = slot === 'A1' ? 'apPriceA1' : 'apPriceA2';
+        var apVal = (approvals[d.ref] || {})[apKey] || '';
+        var apId  = 'ap-' + slot + '-' + d.ref;
         return '<div class="vote-slot-wrap">' +
           '<div class="slot-label">' + label + '</div>' +
           voteArea +
+          '<div class="close-field ap-price-field"><label>ราคาที่อนุมัติ (USD/MT)</label>' +
+            '<input id="' + apId + '" class="close-input" type="text" inputmode="decimal"' +
+            ' placeholder="' + (d.offerPrice ? 'เสนอมา ' + d.offerPrice + ' — เว้นว่าง = อนุมัติตามนี้' : 'เว้นว่าง = อนุมัติตามราคาที่เสนอ') + '"' +
+            ' value="' + apVal + '"' + (dec ? ' disabled' : '') + '></div>' +
           '<div class="remark-area" style="margin-top:8px"><label>หมายเหตุ ' + label + '</label>' +
           '<textarea id="' + remId + '" placeholder="ความเห็น / เงื่อนไข...">' + remVal + '</textarea></div>' +
         '</div>';
@@ -3111,6 +3203,7 @@ function renderCards() {
           '<div class="slot-divider"></div>' +
           slotHtml('A2', dec2) +
         '</div>' +
+        apPriceBox_(d) +
         (status === 'rejected'
           ? '<div class="vote-buttons" style="margin-top:14px">' +
               '<button class="vote-btn btn-trash" onclick="deleteOffer(\'' + d.ref + '\')" title="ซ่อนใบนี้ออกจากหน้าจอ กู้คืนได้">ลบใบนี้</button>' +
@@ -3163,7 +3256,9 @@ function renderCards() {
         var inputs = CLOSE_FIELDS.map(function(f) {
           return '<div class="close-field"><label>' + f.label + '</label>' +
             '<input id="' + f.id + '-' + d.ref + '" class="close-input" type="text" placeholder="' +
-            (d[f.from] ? 'เสนอไว้ ' + (f.key === 'closeMargin' ? fmtMargin_(d[f.from]) : d[f.from]) : '—') +
+            (f.key === 'closePrice' && priceChanged_(d.ref, d)
+              ? 'อนุมัติที่ ' + approvedPrice_(d.ref, d)
+              : (d[f.from] ? 'เสนอไว้ ' + (f.key === 'closeMargin' ? fmtMargin_(d[f.from]) : d[f.from]) : '—')) +
             '" value="' + (av[f.key] || '') + '"></div>';
         }).join('');
         closeInner = '<div class="close-field close-date-wrap"><label>วันที่ปิดการขาย</label>' +
@@ -3235,6 +3330,7 @@ function renderCards() {
           '</div>';
       }
       approveHtml = '<div class="approve-section"><div class="vote-slot-wrap" style="padding-left:0">' +
+        apPriceBox_(d) +
         negotiate +
         '<div class="slot-label">ผลการขาย (หลังอนุมัติ)</div>' + closeInner + '</div></div>';
     }
