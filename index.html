@@ -198,6 +198,18 @@ input[type="number"]::-webkit-inner-spin-button { display: none; }
 .btn-rm:hover { background: var(--red-light); border-color: rgba(192,57,43,0.4); color: var(--red); }
 .btn-add { display: none !important; }
 
+.none-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.btn-none {
+  font-family: "Kanit", sans-serif; font-size: 12px; font-weight: 500;
+  padding: 6px 14px; border-radius: 8px; cursor: pointer;
+  background: rgba(255,255,255,0.8); border: 1.5px dashed var(--border-strong); color: var(--ink-soft);
+  transition: background .18s, color .18s;
+}
+.btn-none:hover { background: var(--orange); color: #fff; border-style: solid; }
+.none-hint { font-size: 11px; color: var(--ink-muted); }
+/* ช่องระดับใบกรอกครั้งเดียวที่รายการแรก การ์ดถัดไปไม่ต้องบังคับ */
+#products-container.has-saved .req-first { display: none; }
+
 /* ── PRODUCT SECTION LABELS ── */
 .prod-section-label {
   font-size: 11px; font-weight: 600; color: var(--ink-muted);
@@ -1567,17 +1579,8 @@ function goNext(from) {
       alert('กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการค่ะ');
       return;
     }
-    if (offerKind !== 'idea') {
-      var missing = false;
-      document.querySelectorAll('.prod-block').forEach(function(b, idx) {
-        var periodEl = b.querySelector('.pp-period');
-        if (periodEl && !periodEl.value.trim()) missing = idx + 1;
-      });
-      if (missing) {
-        alert('กรุณากรอก "Shipment ที่จะเสนอ" ในรายการที่ ' + missing + ' ก่อนค่ะ');
-        return;
-      }
-    }
+    var miss = firstMissingField_();
+    if (miss) { warnMissing_(miss); return; }
   }
   completedTabs[from] = true;
   var next = from + 1;
@@ -1605,6 +1608,64 @@ function setOfferKind(kind) {
   if (bi) bi.setAttribute('aria-pressed', offerKind === 'idea'  ? 'true' : 'false');
   var hint = document.getElementById('kind-hint');
   if (hint) hint.textContent = KIND_HINT[offerKind];
+}
+
+/* ── ช่องที่ต้องกรอก ──
+   ใบที่ส่งมาครึ่งๆ กลางๆ ทำให้ผู้อนุมัติเคาะราคาโดยไม่มีข้อมูล
+   บังคับกรอก แต่ถ้าไม่มีข้อมูลจริงให้พิมพ์ "ไม่มี" ได้ จะได้รู้ว่า "ไม่มี" ไม่ใช่ "ลืมกรอก" */
+var REQ_PROD = [
+  ['.pp-type', 'ประเภทสินค้า / Product'],
+  ['.pp-qty',  'Quantity Request (FCL/MT)'],
+  ['.pp-idea', 'Idea Price (USD/MT or THB/KG)']
+];
+var REQ_OFFER_ALL = [
+  ['.pp-period',       'Shipment ที่จะเสนอ'],
+  ['.pp-offer-price',  'ราคาเสนอ (USD/MT)'],
+  ['.pp-offer-margin', '%Margin (Offer)'],
+  ['.pp-qty-month',    'Quantity per Month (MT)'],
+  ['.pp-offer-date',   'DATE (วันที่จะเสนอ)'],
+  ['.pp-valid',        'VALID (ยืนราคาถึง)']
+];
+/* โหมดไอเดียราคาไม่มีการยืนราคา DATE/VALID ถูกซ่อนไว้ และ Shipment ไม่บังคับ */
+function reqOfferFields_() {
+  if (offerKind !== 'idea') return REQ_OFFER_ALL;
+  return REQ_OFFER_ALL.filter(function(f) {
+    return ['.pp-period', '.pp-offer-date', '.pp-valid'].indexOf(f[0]) === -1;
+  });
+}
+
+/* ช่องระดับใบ (ราคา/VALID/...) ทีมขายกรอกครั้งเดียวที่รายการแรกของใบ
+   ฝั่งอ่านก็หยิบจากแถวแรกของ REF เหมือนกัน จึงตรวจเฉพาะใบแรกของชุดแรก */
+function firstMissingField_() {
+  var blocks = document.querySelectorAll('.prod-block');
+  for (var i = 0; i < blocks.length; i++) {
+    var list = REQ_PROD.slice();
+    if (savedSessions.length === 0 && i === 0) list = list.concat(reqOfferFields_());
+    for (var j = 0; j < list.length; j++) {
+      var el = blocks[i].querySelector(list[j][0]);
+      if (el && !el.value.trim()) return { el: el, label: list[j][1], idx: i + 1 };
+    }
+  }
+  return null;
+}
+
+function warnMissing_(m) {
+  alert('กรุณากรอก "' + m.label + '" ในรายการที่ ' + m.idx + ' ก่อนค่ะ\n\n' +
+        'ถ้าไม่มีข้อมูลจริง ๆ ให้พิมพ์ "ไม่มี" หรือกดปุ่ม \u00ABเติม "ไม่มี" ในช่องที่ว่าง\u00BB ในการ์ดสินค้า');
+  if (m.el) { m.el.focus(); m.el.scrollIntoView({ block: 'center' }); }
+}
+
+/* เติม "ไม่มี" เฉพาะช่องบังคับที่ยังว่างในการ์ดนั้น */
+function fillNone(id) {
+  var b = document.getElementById('pb-' + id);
+  if (!b) return;
+  var blocks = [].slice.call(document.querySelectorAll('.prod-block'));
+  var isFirst = savedSessions.length === 0 && blocks.indexOf(b) === 0;
+  var list = REQ_PROD.concat(isFirst ? reqOfferFields_() : []);
+  list.forEach(function(f) {
+    var el = b.querySelector(f[0]);
+    if (el && !el.value.trim()) el.value = 'ไม่มี';
+  });
 }
 
 /* ── PRODUCTS ── */
@@ -1638,13 +1699,13 @@ function addProduct(data) {
         '<input class="pp-code" type="text" value="' + (data.code||'') + '"></div>' +
     '</div>' +
     '<div class="g2" style="margin-bottom:10px">' +
-      '<div class="field"><label>Quantity Request (FCL/MT)</label>' +
+      '<div class="field"><label>Quantity Request (FCL/MT) <span class="req">*</span></label>' +
         '<input class="pp-qty" type="text" value="' + (data.qty||'') + '"></div>' +
       '<div class="field"><label>Shipment Request</label>' +
         '<input class="pp-months" type="text" value="' + (data.months||'') + '"></div>' +
     '</div>' +
     '<div class="g2" style="margin-bottom:10px">' +
-      '<div class="field"><label>Idea Price (USD/MT or THB/KG)</label>' +
+      '<div class="field"><label>Idea Price (USD/MT or THB/KG) <span class="req">*</span></label>' +
         '<input class="pp-idea" type="text" value="' + (data.idea||'') + '"></div>' +
       '<div class="field"><label>%Margin (Idea)</label>' +
         '<input class="pp-margin" type="text" placeholder="เช่น 45 (ไม่ต้องใส่ %)" value="' + (data.margin||'') + '"></div>' +
@@ -1659,17 +1720,17 @@ function addProduct(data) {
       '<div class="field"><label>Shipment ที่จะเสนอ <span class="req req-offer">*</span></label>' +
         '<input class="pp-period" type="text" placeholder="เช่น Oct/Nov 2026" value="' + (data.period||'') + '"></div>' +
       '<div class="field"><label><span class="lbl-offer">ราคาเสนอ (USD/MT)</span>' +
-        '<span class="lbl-idea">ราคาที่ให้เป็นไอเดีย (USD/MT)</span></label>' +
+        '<span class="lbl-idea">ราคาที่ให้เป็นไอเดีย (USD/MT)</span> <span class="req req-first">*</span></label>' +
         '<input class="pp-offer-price" type="text" placeholder="เช่น $3,625" value="' + (data.offerPrice||'') + '" oninput="calcFreight(this)"></div>' +
-      '<div class="field"><label>%Margin (Offer)</label>' +
+      '<div class="field"><label>%Margin (Offer) <span class="req req-first">*</span></label>' +
         '<input class="pp-offer-margin" type="text" placeholder="เช่น 48.6 (ไม่ต้องใส่ %)" value="' + (data.offerMargin||'') + '"></div>' +
     '</div>' +
     '<div class="g3" style="margin-bottom:10px">' +
-      '<div class="field"><label>Quantity per Month (MT)</label>' +
+      '<div class="field"><label>Quantity per Month (MT) <span class="req req-first">*</span></label>' +
         '<input class="pp-qty-month" type="text" placeholder="เช่น 96 MT / 4 FCL" value="' + (data.qtyMonth||'') + '"></div>' +
-      '<div class="field fld-offer-only"><label>DATE (วันที่จะเสนอ)</label>' +
+      '<div class="field fld-offer-only"><label>DATE (วันที่จะเสนอ) <span class="req req-first">*</span></label>' +
         '<input class="pp-offer-date" type="text" placeholder="เช่น 10/09/2026" value="' + (data.offerDate||'') + '"></div>' +
-      '<div class="field fld-offer-only"><label>VALID (ยืนราคาถึง)</label>' +
+      '<div class="field fld-offer-only"><label>VALID (ยืนราคาถึง) <span class="req req-first">*</span></label>' +
         '<input class="pp-valid" type="text" placeholder="เช่น 7 วัน / ถึง 30/09/2026" value="' + (data.valid||'') + '"></div>' +
     '</div>' +
 
@@ -1700,6 +1761,11 @@ function addProduct(data) {
         '<input class="pp-currency" type="text" placeholder="เช่น JPY 157.62 / THB 32.33" value="' + (data.currency||'') + '"></div>' +
       '<div class="field"><label>อื่นๆ</label>' +
         '<input class="pp-other" type="text" placeholder="ข้อมูลเพิ่มเติม" value="' + (data.other||'') + '"></div>' +
+    '</div>' +
+    '<div class="none-row">' +
+      '<button type="button" class="btn-none" onclick="fillNone(' + id + ')">' +
+        'เติม "ไม่มี" ในช่องที่ว่าง</button>' +
+      '<span class="none-hint">ช่องที่มี <span class="req">*</span> ต้องกรอก — ไม่มีข้อมูลจริง ๆ ให้ใส่ "ไม่มี"</span>' +
     '</div>';
 
   document.getElementById('products-container').appendChild(div);
@@ -1795,6 +1861,8 @@ function getProdData() {
 
 /* ── ADD MORE PRODUCT (จาก Step 2: บันทึก + reset + กลับ Step 2) ── */
 function addMoreProduct() {
+  var miss = firstMissingField_();
+  if (miss) { warnMissing_(miss); return; }
   var currentProds = getProdData();
   if (currentProds.length > 0 && currentProds[0].type) {
     savedSessions.push({
@@ -1843,6 +1911,9 @@ function updateSessionBar() {
   var bar = document.getElementById('session-bar');
   var countEl = document.getElementById('session-count');
   var listEl = document.getElementById('session-list');
+  // ช่องระดับใบกรอกไปแล้วที่ชุดแรก ชุดถัดไปไม่ต้องขึ้นดาว
+  var box = document.getElementById('products-container');
+  if (box) box.classList.toggle('has-saved', savedSessions.length > 0);
   if (!savedSessions.length) { bar.classList.remove('show'); return; }
   bar.classList.add('show');
   countEl.textContent = 'บันทึกแล้ว ' + savedSessions.length + ' ชุด';
@@ -1865,15 +1936,9 @@ function buildMeta_(p) {
 function submitForm() {
   var g = function(id) { return document.getElementById(id) ? document.getElementById(id).value.trim() : ''; };
 
+  var miss = firstMissingField_();
+  if (miss) { warnMissing_(miss); return; }
   var prods = getProdData();
-  if (offerKind !== 'idea') {
-    for (var i = 0; i < prods.length; i++) {
-      if (!prods[i].period) {
-        alert('กรุณากรอก "Shipment ที่จะเสนอ" ให้ครบทุกรายการค่ะ (รายการที่ ' + (i+1) + ')');
-        return;
-      }
-    }
-  }
 
   var refNum = 'SFD-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*9000)+1000);
 
