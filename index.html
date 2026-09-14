@@ -1459,6 +1459,8 @@ var currentTab = 1;
 var completedTabs = {};
 var savedSessions = []; // เก็บข้อมูลแต่ละรอบของสินค้า
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAfBG-BNJfw7y7MnbC6t4zC4Vckewu-VGQBBgSnEhAXqHEYRyFxjmKuvoLZxpM-Lw/exec';
+/* Google ตอบ 400 เมื่อ URL ยาวเกิน — วัดจริงแล้วอยู่ระหว่าง 12,000-14,000 เผื่อไว้ที่ 12,000 */
+var URL_LIMIT = 12000;
 
 /* ค่าเริ่มต้นจากหน้าตั้งค่า — ประกาศไว้ต้นไฟล์เพราะ addProduct() ถูกเรียกตอนโหลด */
 function getSettings() {
@@ -1968,7 +1970,8 @@ function submitForm() {
     incoterm: document.getElementById('t-incoterm').value,
     payment: document.getElementById('t-payment').value,
     orderType: document.getElementById('t-order-type').value,
-    sessions: allSessions,
+    // ไม่ส่ง sessions ขึ้น server — ไม่มีใครอ่าน แต่ซ้ำข้อมูลทุกสินค้าอีกรอบ
+    // ทำให้ URL ยาวขึ้นเท่าตัวจนโดน Google ปัด 400 (ดูหัวข้อ "ข้อจำกัดความยาว URL")
     products: allSessions.reduce(function(acc, s) {
       return acc.concat((s.products || []).map(function(p) {
         return {
@@ -1999,7 +2002,19 @@ function submitForm() {
     // encode ซ้ำ 2 ชั้น: Apps Script ฝั่ง server ทำ decodeURIComponent ซ้ำอีกรอบ
     // ถ้า encode ชั้นเดียว ค่าที่มี % (เช่น "48.6%") จะทำให้ server พังทั้งแถว (URIError)
     // ใช้ fetch เพื่ออ่านผลจริงจาก server — แสดง success เฉพาะเมื่อบันทึกสำเร็จเท่านั้น
-    fetch(APPS_SCRIPT_URL + '?data=' + encodeURIComponent(encodeURIComponent(JSON.stringify(payload))))
+    // Google ปัด URL ที่ยาวเกิน ~13,000 ตัวอักษรด้วย 400 และหน้า error ไม่มี CORS
+    // เบราว์เซอร์จึงรายงานแค่ "Failed to fetch" ซึ่งไม่บอกอะไรเลย — ดักไว้เองก่อน
+    var url = APPS_SCRIPT_URL + '?data=' + encodeURIComponent(encodeURIComponent(JSON.stringify(payload)));
+    if (url.length > URL_LIMIT) {
+      btn.textContent = 'ส่งคำขอใบเสนอราคา'; btn.disabled = false;
+      alert('ข้อมูลยาวเกินกว่าที่ระบบจะส่งได้ในครั้งเดียว\n\n' +
+            'ตอนนี้ยาว ' + url.length.toLocaleString() + ' จากที่รับได้ ' + URL_LIMIT.toLocaleString() + '\n\n' +
+            'วิธีแก้: ย่อข้อความในช่อง "จัดสรรเนื้อ" และ "หมายเหตุ" ให้สั้นลง\n' +
+            'หรือแยกส่งเป็นหลายใบ (ใบละ 1-2 สินค้า)\n\n' +
+            'ข้อความภาษาไทย 1 ตัวอักษรกินพื้นที่ราว 10 ตัว ข้อความยาว ๆ จึงเต็มเร็วกว่าที่คิด');
+      return;
+    }
+    fetch(url)
       .then(function(res) { return res.json(); })
       .then(function(j) {
         if (j.status !== 'ok') throw new Error(j.msg || 'server error');
