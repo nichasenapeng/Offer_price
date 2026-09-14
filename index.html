@@ -198,6 +198,8 @@ input[type="number"]::-webkit-inner-spin-button { display: none; }
 .btn-rm:hover { background: var(--red-light); border-color: rgba(192,57,43,0.4); color: var(--red); }
 .btn-add { display: none !important; }
 
+/* .date-pick ตั้งความกว้างคงที่ไว้สำหรับหน้าอนุมัติ ในฟอร์มต้องเต็มช่องเหมือนช่องอื่น */
+.prod-block .date-pick { width: 100%; flex: 1 1 auto; font-family: "Sarabun", sans-serif; font-weight: 400; }
 .none-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
 .btn-none {
   font-family: "Kanit", sans-serif; font-size: 12px; font-weight: 500;
@@ -1612,6 +1614,26 @@ function setOfferKind(kind) {
   if (hint) hint.textContent = KIND_HINT[offerKind];
 }
 
+/* ── วันที่ ──
+   ชีทเก็บเป็น DD/MM/YYYY มาตลอด (ข้อมูลจริงทุกแถวเป็นแบบนี้) แต่ <input type="date">
+   รับ-ส่งเป็น YYYY-MM-DD จึงแปลงเข้า-ออกที่ขอบ ไม่แตะรูปแบบที่เก็บในชีท */
+function pad2_(n) { return (n < 10 ? '0' : '') + n; }
+function todayISO_() {
+  var d = new Date();
+  return d.getFullYear() + '-' + pad2_(d.getMonth() + 1) + '-' + pad2_(d.getDate());
+}
+function toISO_(v) {
+  var t = String(v || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  var m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return '';                       // ค่าเก่าอย่าง "x" หรือ "7 วัน" ปล่อยว่าง
+  return m[3] + '-' + pad2_(+m[2]) + '-' + pad2_(+m[1]);
+}
+function fromISO_(v) {
+  var m = String(v || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : String(v || '').trim();
+}
+
 /* ── ช่องที่ต้องกรอก ──
    ใบที่ส่งมาครึ่งๆ กลางๆ ทำให้ผู้อนุมัติเคาะราคาโดยไม่มีข้อมูล
    บังคับกรอก แต่ถ้าไม่มีข้อมูลจริงให้พิมพ์ "ไม่มี" ได้ จะได้รู้ว่า "ไม่มี" ไม่ใช่ "ลืมกรอก" */
@@ -1666,7 +1688,8 @@ function fillNone(id) {
   var list = REQ_PROD.concat(isFirst ? reqOfferFields_() : []);
   list.forEach(function(f) {
     var el = b.querySelector(f[0]);
-    if (el && !el.value.trim()) el.value = 'ไม่มี';
+    // ช่องปฏิทินรับได้แต่วันที่ ใส่คำว่า "ไม่มี" ไม่ได้ — ข้ามไป
+    if (el && el.type !== 'date' && !el.value.trim()) el.value = 'ไม่มี';
   });
 }
 
@@ -1731,9 +1754,10 @@ function addProduct(data) {
       '<div class="field"><label>Quantity per Month (MT) <span class="req req-first">*</span></label>' +
         '<input class="pp-qty-month" type="text" placeholder="เช่น 96 MT / 4 FCL" value="' + (data.qtyMonth||'') + '"></div>' +
       '<div class="field fld-offer-only"><label>DATE (วันที่จะเสนอ) <span class="req req-first">*</span></label>' +
-        '<input class="pp-offer-date" type="text" placeholder="เช่น 10/09/2026" value="' + (data.offerDate||'') + '"></div>' +
+        '<input class="pp-offer-date date-pick" type="date" value="' +
+          (data.offerDate ? toISO_(data.offerDate) : todayISO_()) + '"></div>' +
       '<div class="field fld-offer-only"><label>VALID (ยืนราคาถึง) <span class="req req-first">*</span></label>' +
-        '<input class="pp-valid" type="text" placeholder="เช่น 7 วัน / ถึง 30/09/2026" value="' + (data.valid||'') + '"></div>' +
+        '<input class="pp-valid date-pick" type="date" value="' + toISO_(data.valid) + '"></div>' +
     '</div>' +
 
     '<div class="g3" style="margin-bottom:10px">' +
@@ -1846,8 +1870,8 @@ function getProdData() {
       offerPrice: (b.querySelector('.pp-offer-price') ||{}).value||'',
       offerMargin:pctPlain_((b.querySelector('.pp-offer-margin')||{}).value||''),
       qtyMonth:   (b.querySelector('.pp-qty-month')   ||{}).value||'',
-      offerDate:  (b.querySelector('.pp-offer-date')  ||{}).value||'',
-      valid:      (b.querySelector('.pp-valid')       ||{}).value||'',
+      offerDate:  fromISO_((b.querySelector('.pp-offer-date')  ||{}).value||''),
+      valid:      fromISO_((b.querySelector('.pp-valid')       ||{}).value||''),
       freight:    (b.querySelector('.pp-freight')     ||{}).value||'',
       mtPerCont:  (b.querySelector('.pp-mtcont')      ||{}).value||'',
       fx:         (b.querySelector('.pp-fx')          ||{}).value||'',
