@@ -3205,6 +3205,11 @@ function vote(ref, slot, dec) {
     A1:         av.A1 || '',
     A2:         av.A2 || '',
     status:     status,
+    // บอก Apps Script ว่านี่คือการกดโหวตจริง ไม่ใช่การเขียนสถานะซ้ำจากที่อื่น
+    // (undoClose / cancelExtRequest / restoreOffer / saveApprovedPrice ก็ส่ง approved|rejected เหมือนกัน)
+    event:        'vote',
+    voteSlot:     slot,
+    voteDecision: dec,
     remarkA1:   buildApMeta_(av.apPriceA1) + remA1Txt,
     remarkA2:   buildApMeta_(av.apPriceA2) + remA2Txt
   };

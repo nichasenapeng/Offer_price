@@ -247,6 +247,21 @@ Script 2 อยู่ที่โปรเจกต์ `18PRGRxI9Ddfnt5fnKxkX9NW
 
 ทั้งก้อนครอบด้วย try/catch — LINE ล่มหรือ token หมดอายุ การบันทึกผลอนุมัติยังทำงานปกติ
 
+**แจ้งเตือน 3 เหตุการณ์**
+- 🔔 ผู้อนุมัติกด "มีคำถาม" — ดูจาก `status` = `question|SLOT` (2 ส่วน)
+- ✅ A1 หรือ A2 กด Approve — ถ้าครบ 2 คนขึ้น 🎉 พร้อมลิงก์ไปปิดการขาย
+- ❌ กด Reject — พร้อมหมายเหตุว่าทำไม
+
+**ห้ามดูแค่ `status` ตอนแจ้งเตือนการโหวต** — `undoClose()`, `cancelExtRequest()`,
+`restoreOffer()`, `saveApprovedPrice()` ก็ยิง `approved`/`rejected` เหมือนกัน ทั้งที่ไม่ใช่การเคาะใหม่
+`vote()` จึงส่ง `event:'vote'` + `voteSlot` + `voteDecision` มาด้วย และฝั่ง Apps Script
+เชื่อเฉพาะ `event === 'vote'` เท่านั้น
+
+**รับ webhook จาก LINE ที่ URL เดียวกับ doPost** — `handleLineWebhook_()` ดักก่อน
+(payload ของ LINE มี `events[]`) เก็บ groupId เฉพาะตอน `LINE_CAPTURE = '1'` และเฉพาะข้อความจากกลุ่ม
+เก็บเสร็จปิดสวิตช์เอง คนนอกทักบอทจึงแย่งเปลี่ยนปลายทางไม่ได้
+ฟังก์ชัน `showNotifyTarget()` กด Run เพื่อดูว่าตอนนี้ยิงไปที่ไหน
+
 **กับดักตอนตั้งค่า (เสียเวลาไปหลายรอบ)**
 - Apps Script **จำสิทธิ์ที่เคยให้ไว้** พอเพิ่ม `UrlFetchApp` ทีหลังมันไม่ขอ scope ใหม่
   แก้ด้วยการถอนสิทธิ์ที่ myaccount.google.com/permissions แล้ว Run ใหม่ให้มันขออีกรอบ
