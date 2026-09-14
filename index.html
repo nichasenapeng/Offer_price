@@ -2178,6 +2178,8 @@ function cleanCell_(v) {
 }
 
 function g(row, key) { return cleanCell_(row[key]); }
+/* Timestamp เป็นวันที่+เวลาจริง ต้องอ่านดิบ ไม่งั้น cleanCell_ ตัดเวลาทิ้ง */
+function gRaw_(row, key) { return (row[key] == null ? '' : row[key]).toString().trim(); }
 
 /* แกะข้อมูลเสริมที่ฝังไว้ต้นหมายเหตุ ออกมาเป็นช่องแยก */
 function stripMeta_(txt) {
@@ -2199,8 +2201,8 @@ function stripMeta_(txt) {
 function parseSheetRows(rows) {
   var out = [];
   rows.forEach(function(row) {
-    var col1 = g(row, 'Timestamp');
-    var col2 = g(row, 'REF');
+    var col1 = gRaw_(row, 'Timestamp');
+    var col2 = gRaw_(row, 'REF');
 
     var ref, ts;
     if (col1.indexOf('SFD-') === 0) {
