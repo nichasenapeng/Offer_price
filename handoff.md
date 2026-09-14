@@ -235,6 +235,25 @@ Script 2 อยู่ที่โปรเจกต์ `18PRGRxI9Ddfnt5fnKxkX9NW
 เวลาแก้ ต้อง **Deploy → จัดการการทำให้ใช้งานได้ → แก้ตัวเดิม → New version** เท่านั้น
 ถ้ากด "การทำให้ใช้งานได้ใหม่" จะได้ URL ใหม่แล้วเว็บชี้ผิดที่
 
+**4.11 แจ้งเตือน LINE เมื่อผู้อนุมัติกด "มีคำถาม"** — อยู่ใน Apps Script ทั้งหมด
+**ไม่ต้องแก้ `index.html` เลย** เพราะ `askQuestion()` ยิง `question|A1` ผ่าน `postSaleState()` อยู่แล้ว
+`doPost` เรียก `notifyQuestion_(payload)` ก่อน return ซึ่งจะส่งเมื่อ `status` เป็น `question|SLOT`
+เท่านั้น (`question|SLOT|คำตอบ` = ทีมขายตอบแล้ว ไม่ส่งซ้ำ)
+
+ตั้งค่าที่ Project Settings > Script Properties — **token ไม่อยู่ในโค้ดและไม่อยู่ใน git**
+- `LINE_TOKEN` = Channel access token ของ LINE OA "Export Team" (@382ibskr)
+- `LINE_TO` = userId หรือ groupId ปลายทาง
+ไม่ได้ตั้งค่า = ไม่ส่งอะไรเลย ระบบเดิมทำงานปกติ (`pushLine_` เช็คก่อนยิง)
+
+ทั้งก้อนครอบด้วย try/catch — LINE ล่มหรือ token หมดอายุ การบันทึกผลอนุมัติยังทำงานปกติ
+
+**กับดักตอนตั้งค่า (เสียเวลาไปหลายรอบ)**
+- Apps Script **จำสิทธิ์ที่เคยให้ไว้** พอเพิ่ม `UrlFetchApp` ทีหลังมันไม่ขอ scope ใหม่
+  แก้ด้วยการถอนสิทธิ์ที่ myaccount.google.com/permissions แล้ว Run ใหม่ให้มันขออีกรอบ
+  (ประกาศ `oauthScopes` ใน `appsscript.json` อย่างเดียวไม่พอ)
+- ช่องเลือกฟังก์ชันในตัวแก้ไขค้างที่ `setupHeaders` ต้องเปลี่ยนเป็น `testNotify` ก่อนกด Run
+- ทดสอบด้วย curl ไม่ได้ Apps Script ตอบ 405 เพราะ redirect — ต้องยิงจากเบราว์เซอร์แบบ `mode:'no-cors'`
+
 **5. ตารางค่าเฟรท** อยู่ในตัวแปร `DEFAULT_FREIGHT` (47 port, 12 กลุ่ม)
 แก้ใน Setting = เก็บใน localStorage ของเครื่องนั้นเท่านั้น
 ถ้าจะอัปเดตให้ทั้งทีม ต้องแก้ `DEFAULT_FREIGHT` ในโค้ดแล้ว deploy
