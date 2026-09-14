@@ -2177,6 +2177,24 @@ function cleanCell_(v) {
   return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear();
 }
 
+/* Shipment เป็น "ช่วงเดือน" ไม่ใช่วันที่เจาะจง — พิมพ์ "OCT 2026" มา Sheets แปลงเป็น
+   1 ต.ค. 2026 เที่ยงคืน แสดงเป็น 01/10/2026 จึงผิดความหมาย คืนเป็น "OCT 2026" แทน
+   ถ้าเป็นวันอื่นที่ไม่ใช่วันที่ 1 แปลว่าตั้งใจระบุวัน ก็แสดงวันด้วย */
+var MON_ = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function fmtShipment_(v) {
+  var t = (v == null ? '' : v).toString().trim();
+  if (!t) return '';
+  var isJsDate = /^[A-Z][a-z]{2} [A-Z][a-z]{2} \d{2} \d{4} \d{2}:\d{2}:\d{2} GMT[+-]\d{4}/.test(t);
+  var isIso    = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(t);
+  if (!isJsDate && !isIso) return t;          // 'OCT/NOV 2026', 'DEC', 'x' ปล่อยตามที่พิมพ์
+  var d = new Date(t);
+  if (isNaN(d.getTime())) return t;
+  var mon = MON_[d.getMonth()] + ' ' + d.getFullYear();
+  return (d.getDate() === 1 && d.getHours() === 0 && d.getMinutes() === 0)
+    ? mon                                     // วันที่ 1 เที่ยงคืน = พิมพ์มาแค่เดือน
+    : d.getDate() + ' ' + mon;
+}
+
 function g(row, key) { return cleanCell_(row[key]); }
 /* Timestamp เป็นวันที่+เวลาจริง ต้องอ่านดิบ ไม่งั้น cleanCell_ ตัดเวลาทิ้ง */
 function gRaw_(row, key) { return (row[key] == null ? '' : row[key]).toString().trim(); }
@@ -2250,7 +2268,7 @@ function parseSheetRows(rows) {
           type:       cleanCell_(p['Product']),
           spec:       cleanCell_(p['Specification']),
           qty:        cleanCell_(p['Quantity Request (FCL/MT)']),
-          months:     cleanCell_(p['Shipment Request']),
+          months:     fmtShipment_(p['Shipment Request']),
           ideaPrice:  ipDisplay,
           marginIdea: cleanCell_(p['%Margin (Idea)']),
           // ราคาเสนอรายสินค้า — จะมีก็ต่อเมื่อ Apps Script ส่งมาให้ (ยังไม่ส่งในเวอร์ชันปัจจุบัน)
@@ -2266,7 +2284,7 @@ function parseSheetRows(rows) {
         type:      g(row, 'Product'),
         spec:      g(row, 'Specification'),
         qty:       g(row, 'Quantity Request (FCL/MT)'),
-        months:    g(row, 'Shipment Request'),
+        months:    fmtShipment_(gRaw_(row, 'Shipment Request')),
         ideaPrice: ideaDisplay,
         marginIdea:g(row, '%Margin (Idea)')
       }];
@@ -2291,7 +2309,7 @@ function parseSheetRows(rows) {
       lastOffer:  g(row, 'ราคาเสนอล่าสุด'),
       currency:   g(row, 'ค่าเงิน'),
       other:      g(row, 'อื่นๆ'),
-      period:     g(row, 'Shipment ที่จะเสนอ'),
+      period:     fmtShipment_(gRaw_(row, 'Shipment ที่จะเสนอ')),
       offerPrice: offerClean,
       offerMargin:g(row, '%Margin (Offer)'),
       totalQty:   g(row, 'Total Quantity (MT)'),
