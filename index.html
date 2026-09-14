@@ -687,6 +687,7 @@ body::before, body::after { display: none !important; }
 .pt{font-weight:600;color:var(--ink)}
 .pc{font-family:"Kanit",sans-serif;font-weight:500;font-size:11px;color:var(--ink-muted);letter-spacing:.04em}
 .pv{font-family:"Kanit",sans-serif;font-weight:600;font-size:15px;color:var(--red);letter-spacing:.01em}
+.pv-offer{color:var(--green)}
 .mg{font-size:12px;font-weight:700}
 .mg-h{color:var(--green)}.mg-m{color:var(--yellow)}.mg-l{color:var(--red)}
 
@@ -2161,7 +2162,22 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzaa16CiQbLUhCNTiIkVSuFhC
 var DATA = [];
 var dataLoaded = false;
 
-function g(row, key) { return (row[key] || '').toString().trim(); }
+/* Google Sheets แปลงข้อความที่ดูเหมือนวันที่ (เช่น "Oct 2026") เป็น Date เอง
+   Apps Script จึงคืนมาเป็น "Thu Oct 01 2026 00:00:00 GMT+0700 (เวลาอินโดจีน)"
+   แปลงกลับเป็น DD/MM/YYYY ให้อ่านรู้เรื่อง — ค่าอื่นปล่อยผ่านตามเดิม */
+function cleanCell_(v) {
+  var t = (v == null ? '' : v).toString().trim();
+  if (!t) return '';
+  var isJsDate = /^[A-Z][a-z]{2} [A-Z][a-z]{2} \d{2} \d{4} \d{2}:\d{2}:\d{2} GMT[+-]\d{4}/.test(t);
+  var isIso    = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(t);
+  if (!isJsDate && !isIso) return t;
+  var d = new Date(t);
+  if (isNaN(d.getTime())) return t;
+  var p2 = function(n){ return (n < 10 ? '0' : '') + n; };
+  return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear();
+}
+
+function g(row, key) { return cleanCell_(row[key]); }
 
 /* แกะข้อมูลเสริมที่ฝังไว้ต้นหมายเหตุ ออกมาเป็นช่องแยก */
 function stripMeta_(txt) {
@@ -2226,15 +2242,18 @@ function parseSheetRows(rows) {
     if (Array.isArray(row.products) && row.products.length > 0) {
       // Apps Script grouped แล้ว → แปลงแต่ละ product
       products = row.products.map(function(p) {
-        var ip = (p['Idea Price'] || '').toString().trim();
+        var ip = cleanCell_(p['Idea Price']);
         var ipDisplay = ip ? (ip.indexOf('$') === 0 ? ip : '$' + ip) : '';
         return {
-          type:       (p['Product'] || '').toString().trim(),
-          spec:       (p['Specification'] || '').toString().trim(),
-          qty:        (p['Quantity Request (FCL/MT)'] || '').toString().trim(),
-          months:     (p['Shipment Request'] || '').toString().trim(),
+          type:       cleanCell_(p['Product']),
+          spec:       cleanCell_(p['Specification']),
+          qty:        cleanCell_(p['Quantity Request (FCL/MT)']),
+          months:     cleanCell_(p['Shipment Request']),
           ideaPrice:  ipDisplay,
-          marginIdea: (p['%Margin (Idea)'] || '').toString().trim()
+          marginIdea: cleanCell_(p['%Margin (Idea)']),
+          // ราคาเสนอรายสินค้า — จะมีก็ต่อเมื่อ Apps Script ส่งมาให้ (ยังไม่ส่งในเวอร์ชันปัจจุบัน)
+          offerPrice:  cleanCell_(p['ราคาเสนอ (USD/MT)'] || p['offerPrice'] || ''),
+          offerMargin: cleanCell_(p['%Margin (Offer)'] || p['offerMargin'] || '')
         };
       });
     } else {
@@ -3282,13 +3301,16 @@ function renderCards() {
 
     var pRows = '';
     (d.products || []).forEach(function(p) {
-      var mc = mgClass(p.marginIdea || d.offerMargin);
+      // แสดงเฉพาะค่าของสินค้าชิ้นนั้นจริง ๆ — เดิมยืม %Margin ระดับใบมาใส่ทุกแถว
+      // ทำให้ดูเหมือนทุกสินค้ามีค่าเท่ากัน ทั้งที่เป็นตัวเลขของทั้งใบตัวเดียว
+      var mc = mgClass(p.marginIdea);
       pRows += '<tr>' +
         '<td><div class="pt">' + (p.type || '—') + '</div>' + (p.spec ? '<div class="pc">' + p.spec + '</div>' : '') + '</td>' +
         '<td style="color:#555">' + (p.qty || '—') + '</td>' +
         '<td style="color:#555">' + (p.months || '—') + '</td>' +
         '<td><span class="pv">' + (p.ideaPrice || '—') + '</span></td>' +
-        '<td><span class="mg ' + mc + '">' + fmtMargin_(p.marginIdea || d.offerMargin) + '</span></td>' +
+        '<td><span class="mg ' + mc + '">' + (p.marginIdea ? fmtMargin_(p.marginIdea) : '—') + '</span></td>' +
+        '<td><span class="pv pv-offer">' + (p.offerPrice ? fmtPrice_(p.offerPrice) : '—') + '</span></td>' +
         '</tr>';
     });
 
@@ -3559,8 +3581,8 @@ function renderCards() {
       offerDetail +
       '<div class="card-products">' +
         '<div class="prod-lbl">รายการสินค้า</div>' +
-        '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>Shipment</th><th>Idea Price</th><th>%Margin (Idea)</th></tr></thead>' +
-        '<tbody>' + (pRows || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:14px">ไม่มีข้อมูลสินค้า</td></tr>') + '</tbody></table>' +
+        '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>Shipment</th><th>Idea Price</th><th>%Margin (Idea)</th><th>ราคาเสนอ</th></tr></thead>' +
+        '<tbody>' + (pRows || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:14px">ไม่มีข้อมูลสินค้า</td></tr>') + '</tbody></table>' +
       '</div>' +
       hist +
       (d.remark ? '<div class="remark-row"><b>หมายเหตุ:</b> ' + d.remark + '</div>' : '') +
