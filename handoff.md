@@ -326,6 +326,14 @@ directory = "./public"
 ```bash
 CLOUDFLARE_ACCOUNT_ID=186b05df927d0192ed92ec799dc1b2a0 npx wrangler deploy
 ```
+
+**เช็ค `wrangler.toml` ทุกครั้งก่อนกด deploy** — โฟลเดอร์ deploy อยู่ใน `/tmp` ซึ่งระบบล้างทิ้งได้
+ถ้า `wrangler.toml` หาย wrangler จะ**สร้าง config ใหม่ให้เองโดยตั้งชื่อ worker ตามชื่อโฟลเดอร์**
+แล้วไปสร้าง worker ตัวใหม่แทนที่จะอัปเดต `sunfood-offer` (เคยเกิดจริง 15 ก.ย. 2026
+ได้ worker เกินมาชื่อ `cf-deploy` พร้อม URL สาธารณะ ต้องลบทิ้งด้วย
+`npx wrangler delete --name cf-deploy`)
+
+ดูบรรทัดผลลัพธ์ให้ขึ้นว่า `Uploaded sunfood-offer` ถ้าขึ้นชื่ออื่น = ผิดตัว
 token หมดอายุบ่อย และเวลา refresh เองมันเด้งกลับไปเป็นบัญชี ai.eng.sunfood ซึ่งเข้า worker ของ nicha ไม่ได้
 ต้อง `npx wrangler login` ใหม่ แล้วให้ผู้ใช้กด Allow **ภายใน 2 นาที** โดยเบราว์เซอร์ต้อง sign in เป็น nicha อยู่ก่อน
 เช็คว่าได้บัญชีถูกด้วย `npx wrangler whoami` — ต้องขึ้น account ID `186b05df...`
