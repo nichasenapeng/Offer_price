@@ -2062,6 +2062,7 @@ function submitForm() {
 }
 
 function showSuccess(refNum) {
+  applySupersede_();   // ใบใหม่ลงชีทแล้ว ค่อยปิดใบเดิมเป็น bidding
   document.getElementById('ref-number').textContent = 'REF: ' + refNum;
   document.getElementById('success-overlay').classList.add('show');
 }
@@ -2069,6 +2070,7 @@ function showSuccess(refNum) {
 function resetForm() {
   document.getElementById('success-overlay').classList.remove('show');
   window._reviseFrom = null;
+  window._supersedeOnSubmit = null;
   var rvb = document.getElementById('revise-banner');
   if (rvb) { rvb.style.display = 'none'; rvb.innerHTML = ''; }
   document.getElementById('c-company').value = '';
@@ -2989,13 +2991,33 @@ function decideExtension(ref, ok) {
 }
 
 /* ── ลูกค้าขอ bidding → ออกใบใหม่ แล้วปิดใบเดิมเป็นสถานะ bidding ── */
+/* ใบเดิมจะถูกตีเป็น superseded ก็ต่อเมื่อใบใหม่ส่งสำเร็จแล้วเท่านั้น
+   เดิมเขียนลงชีททันทีที่กดปุ่ม ถ้าคนกดปิดหน้าไปหรือส่งไม่ผ่าน (เช่นชนเพดาน URL)
+   ใบเดิมจะค้างเป็น bidding ตลอดไปโดยไม่มีใบใหม่มาแทน แล้วหลุดจาก "รอปิดการขาย" */
 function requestBidding(ref) {
-  var reason = 'ลูกค้าขอ bidding ใหม่';
-  if (!approvals[ref]) approvals[ref] = {};
-  approvals[ref].superseded = true;
-  approvals[ref].supersededReason = reason;
-  postSaleState(ref, 'superseded|' + reason);
+  window._supersedeOnSubmit = { ref: ref, reason: 'ลูกค้าขอ bidding ใหม่' };
   reviseOffer(ref, 'bidding');
+}
+/* เรียกจาก showSuccess() เท่านั้น — ยืนยันแล้วว่าใบใหม่ลงชีทจริง */
+function applySupersede_() {
+  var pend = window._supersedeOnSubmit;
+  window._supersedeOnSubmit = null;
+  if (!pend) return;
+  if (!approvals[pend.ref]) approvals[pend.ref] = {};
+  approvals[pend.ref].superseded = true;
+  approvals[pend.ref].supersededReason = pend.reason;
+  postSaleState(pend.ref, 'superseded|' + pend.reason);
+}
+/* ยกเลิก bidding — ใบเดิมกลับไปอยู่ในรายการรอปิดการขายตามเดิม */
+function undoBidding(ref) {
+  var a = approvals[ref] || {};
+  if (!a.superseded) return;
+  if (!confirm('ยกเลิก bidding ของใบ ' + ref + ' ?\n\nใบนี้จะกลับไปอยู่ในรายการ "รอปิดการขาย" ตามเดิม')) return;
+  delete a.superseded;
+  delete a.supersededReason;
+  postSaleState(ref, getStatus(ref));
+  showToast('ยกเลิก bidding แล้ว — กลับเป็นรอปิดการขาย', 'green');
+  renderCards();
 }
 
 /* ── แก้ไขใบที่ถูกปฏิเสธแล้วส่งใหม่ ── */
@@ -3007,6 +3029,7 @@ function reviseOffer(ref, mode) {
   if (av.remarkA1) reasons.push('Approve 1: ' + av.remarkA1);
   if (av.remarkA2) reasons.push('Approve 2: ' + av.remarkA2);
 
+  if (mode !== 'bidding') window._supersedeOnSubmit = null;
   enterRole('offer');
   if (d.salesUser) selectUser(d.salesUser);
 
@@ -3053,7 +3076,7 @@ function reviseOffer(ref, mode) {
   if (banner) {
     banner.innerHTML = (mode === 'bidding'
         ? '<b>ต่อรองใหม่จากใบ ' + ref + ' (เคยอนุมัติแล้ว)</b>' +
-          '<div class="revise-reason">ลูกค้าขอ bidding ใหม่ — ใบเดิมถูกปิดเป็น "bidding" แล้ว</div>'
+          '<div class="revise-reason">ลูกค้าขอ bidding ใหม่ — ใบเดิมจะถูกปิดเป็น "bidding" เมื่อส่งใบใหม่สำเร็จ</div>'
         : '<b>กำลังแก้ไขใบที่ถูกปฏิเสธ ' + ref + '</b>' +
           (reasons.length ? '<div class="revise-reason">' + reasons.join('<br>') + '</div>' : '')) +
       '<div class="revise-hint">ข้อมูลเดิมถูกกรอกไว้ให้แล้ว — แก้เฉพาะจุดที่ต้องปรับ แล้วกดส่งเพื่อออกใบใหม่</div>';
@@ -3520,6 +3543,15 @@ function renderCards() {
           '<button class="vote-btn btn-revise" onclick="reviseOffer(\'' + d.ref + '\')">แก้ไขและส่งใหม่</button>' +
           '<button class="vote-btn btn-trash" onclick="deleteOffer(\'' + d.ref + '\')" title="ซ่อนใบนี้ออกจากหน้าจอ กู้คืนได้">ลบใบนี้</button>' +
         '</div>' +
+      '</div></div>';
+    }
+    else if (window._statusMode && status === 'superseded') {
+      approveHtml = '<div class="approve-section"><div class="vote-slot-wrap" style="padding-left:0">' +
+        '<div class="slot-label">ปิดเป็น bidding</div>' +
+        '<div class="vote-result notoffer">ใบนี้ถูกแทนที่ด้วยใบใหม่แล้ว' +
+          '<button class="btn-undo" onclick="undoBidding(\'' + d.ref + '\')">ยกเลิก bidding</button></div>' +
+        (av.supersededReason ? '<div class="close-remark-note"><b>เหตุผล:</b> ' + av.supersededReason + '</div>' : '') +
+        '<div class="trash-note">ถ้าใบใหม่ไม่ได้ถูกส่งจริง กด "ยกเลิก bidding" เพื่อเอาใบนี้กลับไปรอปิดการขาย</div>' +
       '</div></div>';
     }
     else if (window._statusMode && (status === 'approved' || status === 'closed-won' || status === 'closed-lost' || status === 'not-offered')) {
@@ -3997,6 +4029,7 @@ function enterRole(role) {
   }
 }
 function switchRole() {
+  window._supersedeOnSubmit = null;   // ทิ้งฟอร์มกลางคัน = ใบเดิมยังอยู่ในรอปิดการขาย
   // กลับหน้าหลัก: ตัด ?mode= ออก ไม่งั้นจะเด้งเข้าโหมดเดิมซ้ำ
   var u = new URL(location.href);
   u.searchParams.delete('mode');
