@@ -739,6 +739,10 @@ body::before, body::after { display: none !important; }
 .btn-notoffer{background:#eef2f7;color:#475569;border:1.5px solid #cbd5e1}
 .btn-notoffer:hover{background:#475569;color:#fff;transform:translateY(-1px);box-shadow:0 4px 14px rgba(71,85,105,.28)}
 .vote-result.notoffer{background:#eef2f7;color:#475569;border:1px solid #cbd5e1}
+.btn-idea{background:#FEF3C7;color:#8a5a08;border:1.5px solid #f0c76b}
+.btn-idea:hover{background:#8a5a08;color:#fff;transform:translateY(-1px);box-shadow:0 4px 14px rgba(138,90,8,.28)}
+.idea-note{margin-bottom:14px;padding:10px 14px;border-radius:10px;background:#FEF3C7;color:#8a5a08;border:1px solid #f0c76b;font-size:14px}
+.idea-note .idea-remark{margin-top:4px;color:#5c3d05;white-space:pre-wrap}
 /* ลบ = ซ่อนจากหน้าจอ แถวยังอยู่ในชีท กู้คืนได้ตลอด */
 .btn-trash{background:transparent;color:var(--ink-muted);border:1.5px dashed #cbd5e1}
 .btn-trash:hover{background:var(--red);color:#fff;border-color:var(--red);border-style:solid}
@@ -1442,6 +1446,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
   <button class="filter-btn active" id="filter-pending"  onclick="setFilter('pending',this)">รออนุมัติ</button>
   <button class="filter-btn" id="filter-partial"  onclick="setFilter('partial',this)">Approve 1 แล้ว</button>
   <button class="filter-btn" id="filter-approved" onclick="setFilter('approved',this)">อนุมัติครบ</button>
+  <button class="filter-btn" id="filter-idea-given" onclick="setFilter('idea-given',this)">ให้ไอเดียราคา</button>
   <button class="filter-btn" id="filter-rejected" onclick="setFilter('rejected',this)">ปฏิเสธ</button>
   <button class="filter-btn" id="filter-closed-won" onclick="setFilter('closed-won',this)">ปิดการขายได้</button>
   <button class="filter-btn" id="filter-closed-lost" onclick="setFilter('closed-lost',this)">ไม่ปิดการขาย</button>
@@ -2381,6 +2386,7 @@ function demoApprovals() {
     'SFD-2026-0106': { A1:'approved', A2:'approved', close:'closed-won', closeShipment:'Nov/Dec 2026', closeQty:'48 MT / 2 FCL', closePrice:'3,300', closeMargin:'41.2%', closeRemark:'ลูกค้าตกลงตามราคาเสนอ ขอเลื่อน shipment เป็นต้นเดือน', closeDate:'2026-09-05' },
     'SFD-2026-0107': { A1:'approved', A2:'approved', close:'closed-won', closeShipment:'Jan 2027', closeQty:'24 MT / 1 FCL', closePrice:'3,900', closeMargin:'47.5%', closeDate:'2026-09-06' },
     'SFD-2026-0108': { A1:'approved', A2:'approved', close:'closed-lost' },
+    'SFD-2026-0103': { A1:'approved', A2:'approved', close:'idea-given', closeRemark:'ให้ไอเดีย 3,250–3,300 ไปก่อน ลูกค้าขอเช็คงบภายในสัปดาห์หน้า', closeDate:'2026-09-15' },
     'SFD-2026-0105': { A1:'approved', A2:'approved', close:'not-offered', closeRemark:'ลูกค้าเปลี่ยนแผน ยังไม่ได้ส่งราคาให้', closeDate:'2026-09-08' },
     'SFD-2026-0109': { A1:'rejected', remarkA1:'margin ต่ำกว่าเกณฑ์ ขอปรับราคาใหม่' },
     'SFD-2026-0110': { A1:'approved' }
@@ -2459,7 +2465,7 @@ function loadData() {
             approvals[d.ref].superseded = true;
             approvals[d.ref].supersededReason = ov[1] || '';
           }
-          if (ov[0] === 'closed-won' || ov[0] === 'closed-lost' || ov[0] === 'not-offered') {
+          if (ov[0] === 'closed-won' || ov[0] === 'closed-lost' || ov[0] === 'not-offered' || ov[0] === 'idea-given') {
             approvals[d.ref].close = ov[0];
             if (ov.length >= 5) {
               CLOSE_FIELDS.forEach(function(f, i){ if (ov[i+1]) approvals[d.ref][f.key] = ov[i+1]; });
@@ -2755,7 +2761,7 @@ function freightCells_(d) {
 }
 
 function badge(status) {
-  var m = { pending:['badge-pending','รออนุมัติ'], approved:['badge-approved','อนุมัติครบ — รอปิดการขาย'], rejected:['badge-rejected','ปฏิเสธ'], partial:['badge-partial','Approve 1 แล้ว'], 'closed-won':['badge-approved','ปิดการขายได้'], 'closed-lost':['badge-lost','ไม่ปิดการขาย'], 'not-offered':['badge-notoffer','ไม่เสนอ'], 'deleted':['badge-deleted','ลบแล้ว'], 'superseded':['badge-partial','bidding'], 'question':['badge-question','มีคำถาม'] };
+  var m = { pending:['badge-pending','รออนุมัติ'], approved:['badge-approved','อนุมัติครบ — รอปิดการขาย'], rejected:['badge-rejected','ปฏิเสธ'], partial:['badge-partial','Approve 1 แล้ว'], 'closed-won':['badge-approved','ปิดการขายได้'], 'closed-lost':['badge-lost','ไม่ปิดการขาย'], 'not-offered':['badge-notoffer','ไม่เสนอ'], 'idea-given':['badge-question','ให้ไอเดียราคา — รอติดตาม'], 'deleted':['badge-deleted','ลบแล้ว'], 'superseded':['badge-partial','bidding'], 'question':['badge-question','มีคำถาม'] };
   var s = m[status] || m.pending;
   return '<span class="status-badge ' + s[0] + '">' + s[1] + '</span>';
 }
@@ -3154,6 +3160,12 @@ function closeSale(ref, result) {
     }
     vals.push(remark);
   } else {
+    // ให้ไอเดียราคาต้องบอกว่าให้อะไรไป ไม่งั้นตอนตามต่อจะไม่รู้ว่าคุยค้างไว้ที่ไหน
+    if (result === 'idea-given' && !remark) {
+      showToast('ใส่ใน Remark ว่าให้ไอเดียราคาอะไรกับลูกค้า', 'red');
+      if (remEl) remEl.focus();
+      return;
+    }
     CLOSE_FIELDS.forEach(function(f){ delete approvals[ref][f.key]; });
     vals = ['', '', '', '', remark];
   }
@@ -3166,8 +3178,9 @@ function closeSale(ref, result) {
   postSaleState(ref, vals ? result + '|' + vals.join('|') : result);
   var doneMsg = { 'closed-won': 'บันทึกแล้ว: ปิดการขายได้ ' + approvals[ref].closePrice + ' USD/MT',
                   'closed-lost': 'บันทึกแล้ว: ไม่ปิดการขาย',
-                  'not-offered': 'บันทึกแล้ว: ไม่เสนอราคานี้ให้ลูกค้า' };
-  showToast(doneMsg[result] || 'บันทึกแล้ว', result === 'closed-won' ? 'green' : 'red');
+                  'not-offered': 'บันทึกแล้ว: ไม่เสนอราคานี้ให้ลูกค้า',
+                  'idea-given':  'บันทึกแล้ว: ให้ไอเดียราคา — รอติดตามผล' };
+  showToast(doneMsg[result] || 'บันทึกแล้ว', (result === 'closed-won' || result === 'idea-given') ? 'green' : 'red');
   renderCards();
 }
 /* ── ลบใบที่ถูกปฏิเสธ (ซ่อนจากหน้าจอ แถวยังอยู่ในชีท) ── */
@@ -3272,7 +3285,7 @@ function vote(ref, slot, dec) {
 function saveApprovedPrice(ref, slot) {
   if (!curKey) { showToast('กรุณาเข้าสู่ระบบก่อน'); return; }
   var st = getStatus(ref);
-  if (['pending', 'partial', 'approved'].indexOf(st) === -1) {
+  if (['pending', 'partial', 'approved', 'idea-given'].indexOf(st) === -1) {
     showToast('แก้ราคาที่อนุมัติได้เฉพาะก่อนปิดการขาย', 'red');
     return;
   }
@@ -3288,7 +3301,9 @@ function saveApprovedPrice(ref, slot) {
   // สถานะรวมอาจกำลังถือคำขอขยาย VALID อยู่ อย่าเขียนทับให้หาย
   var statusVal = av.extState
     ? 'ext-' + av.extState + '|' + (av.extValid || '') + '|' + (av.extReason || '') + '|' + (av.extNote || '')
-    : st;
+    : (st === 'idea-given')
+      ? 'idea-given|||||' + (av.closeRemark || '') + '|' + (av.closeDate || '')
+      : st;
   postSaleState(ref, statusVal);
   showToast(v ? 'บันทึกราคาที่อนุมัติ ' + v + ' แล้ว' : 'ล้างราคาที่อนุมัติแล้ว', 'green');
   renderCards();
@@ -3330,7 +3345,7 @@ function renderCards() {
     // โหมดเช็คสถานะ: เห็นเฉพาะใบที่ผู้อนุมัติตัดสินแล้ว (อนุมัติครบ / ปิดการขาย / ถูกปฏิเสธ)
     data = DATA.filter(function(d) {
       var st = getStatus(d.ref);
-      return st === 'approved' || st === 'closed-won' || st === 'closed-lost' ||
+      return st === 'approved' || st === 'idea-given' || st === 'closed-won' || st === 'closed-lost' ||
              st === 'not-offered' || st === 'rejected' || st === 'superseded' ||
              st === 'question' || st === 'deleted';
     });
@@ -3554,9 +3569,10 @@ function renderCards() {
         '<div class="trash-note">ถ้าใบใหม่ไม่ได้ถูกส่งจริง กด "ยกเลิก bidding" เพื่อเอาใบนี้กลับไปรอปิดการขาย</div>' +
       '</div></div>';
     }
-    else if (window._statusMode && (status === 'approved' || status === 'closed-won' || status === 'closed-lost' || status === 'not-offered')) {
+    else if (window._statusMode && (status === 'approved' || status === 'idea-given' || status === 'closed-won' || status === 'closed-lost' || status === 'not-offered')) {
       var closeInner;
-      if (status === 'approved') {
+      if (status === 'approved' || status === 'idea-given') {
+        var isIdea = status === 'idea-given';
         var inputs = CLOSE_FIELDS.map(function(f) {
           return '<div class="close-field"><label>' + f.label + '</label>' +
             '<input id="' + f.id + '-' + d.ref + '" class="close-input" type="text" placeholder="' +
@@ -3565,8 +3581,14 @@ function renderCards() {
               : (d[f.from] ? 'เสนอไว้ ' + (f.key === 'closeMargin' ? fmtMargin_(d[f.from]) : d[f.from]) : '—')) +
             '" value="' + (av[f.key] || '') + '"></div>';
         }).join('');
-        closeInner = '<div class="close-field close-date-wrap"><label>วันที่ปิดการขาย</label>' +
-          dateInput('close-date-' + d.ref, av.closeDate || todayISO()) + '</div>' +
+        // ใบที่ให้ไอเดียไปแล้ว ยังปิดการขายต่อได้ — วันที่ของไอเดียไม่ใช่วันที่ปิดการขาย จึงเริ่มที่วันนี้
+        closeInner = (isIdea
+            ? '<div class="idea-note"><b>ให้ไอเดียราคาแล้ว' + (av.closeDate ? ' เมื่อ ' + thaiDate(av.closeDate) : '') + '</b> — รอติดตามผลกับลูกค้า' +
+              (av.closeRemark ? '<div class="idea-remark">' + av.closeRemark + '</div>' : '') +
+              '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">ยกเลิก</button></div>'
+            : '') +
+          '<div class="close-field close-date-wrap"><label>' + (isIdea ? 'วันที่ (ปิดการขาย / อัปเดตไอเดีย)' : 'วันที่ปิดการขาย') + '</label>' +
+          dateInput('close-date-' + d.ref, isIdea ? todayISO() : (av.closeDate || todayISO())) + '</div>' +
           '<div class="close-grid">' + inputs + '</div>' +
           '<div class="close-field close-remark-wrap"><label>Remark (ถ้ามี)</label>' +
           '<textarea id="close-remark-' + d.ref + '" class="close-input close-remark" rows="2" placeholder="เช่น ลูกค้าขอเลื่อน shipment, ต่อรองราคาลง, คู่แข่งเสนอต่ำกว่า">' + (av.closeRemark || '') + '</textarea></div>' +
@@ -3574,6 +3596,8 @@ function renderCards() {
             '<button class="vote-btn btn-approve" onclick="closeSale(\'' + d.ref + '\',\'closed-won\')">ปิดการขายได้</button>' +
             '<button class="vote-btn btn-reject" onclick="closeSale(\'' + d.ref + '\',\'closed-lost\')">ไม่ปิดการขาย</button>' +
             '<button class="vote-btn btn-notoffer" onclick="closeSale(\'' + d.ref + '\',\'not-offered\')" title="ไม่ได้เสนอราคานี้ให้ลูกค้า — ระบุเหตุผลใน Remark">ไม่เสนอ</button>' +
+            '<button class="vote-btn btn-idea" onclick="closeSale(\'' + d.ref + '\',\'idea-given\')" title="ให้ไอเดียราคากับลูกค้าแล้ว ยังไม่รู้ผล — ระบุใน Remark ว่าให้อะไรไป">' +
+              (isIdea ? 'อัปเดตไอเดียราคา' : 'ให้ไอเดียราคา') + '</button>' +
           '</div>';
       } else if (status === 'closed-won') {
         var cells = '<div class="close-cell"><div class="dl">วันที่ปิดการขาย</div><div class="dv">' + thaiDate(av.closeDate) + '</div></div>' +
@@ -3802,13 +3826,14 @@ function updateFilterCounts_(data) {
     'filter-pending': 'pending', 'filter-partial': 'partial', 'filter-approved': 'approved',
     'filter-rejected': 'rejected', 'filter-closed-won': 'closed-won',
     'filter-closed-lost': 'closed-lost', 'filter-not-offered': 'not-offered',
+    'filter-idea-given': 'idea-given',
     'filter-superseded': 'superseded', 'filter-deleted': 'deleted',
     'filter-question': 'question'
   };
   var count = function(st){ return data.filter(function(d){ return getStatus(d.ref) === st; }).length; };
   // สถานะที่ยังต้องมีคนลงมือ — เน้นสีให้เห็น
   var needsAction = window._statusMode
-    ? {'approved':1, 'question':1}     // เซลส์: ตามปิดการขาย + ตอบคำถาม
+    ? {'approved':1, 'question':1, 'idea-given':1}   // เซลส์: ตามปิดการขาย + ตอบคำถาม + ตามผลไอเดียราคา
     : {'pending':1, 'partial':1, 'question':1};  // ผู้อนุมัติ: เคาะ + คำถามที่ตอบกลับมาแล้ว
 
   var paint = function(b, n, urgent) {
@@ -3836,7 +3861,7 @@ function updateFilterCounts_(data) {
   if (pill) {
     var total, label;
     if (window._summaryMode) { total = 0; }
-    else if (window._statusMode) { total = count('approved') + count('question'); label = 'รอคุณดำเนินการ'; }
+    else if (window._statusMode) { total = count('approved') + count('question') + count('idea-given'); label = 'รอคุณดำเนินการ'; }
     else { total = count('pending') + count('partial') + count('question') + extN; label = 'รอคุณดำเนินการ'; }
     pill.style.display = total ? 'inline-flex' : 'none';
     pill.innerHTML = '<span class="notif-dot"></span>' + label + ' <b>' + total + '</b>';
@@ -3844,7 +3869,7 @@ function updateFilterCounts_(data) {
 }
 function jumpToPending() {
   var order = window._statusMode
-    ? ['filter-question', 'filter-approved']
+    ? ['filter-question', 'filter-approved', 'filter-idea-given']
     : ['filter-pending', 'filter-partial', 'filter-question', 'filter-ext'];
   for (var i = 0; i < order.length; i++) {
     var b = document.getElementById(order[i]);
@@ -3990,7 +4015,7 @@ function enterRole(role) {
   }
   if (role === 'approve') {
     // ผลการปิดการขายเป็นงานของทีมขาย — ดูได้ในหน้าเช็คสถานะ
-    ['filter-closed-won','filter-closed-lost','filter-not-offered'].forEach(function(id){
+    ['filter-closed-won','filter-closed-lost','filter-not-offered','filter-idea-given'].forEach(function(id){
       var b = document.getElementById(id); if (b) b.style.display = 'none';
     });
   }
