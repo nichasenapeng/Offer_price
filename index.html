@@ -699,6 +699,16 @@ body::before, body::after { display: none !important; }
 }
 .hist-section strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;color:#b45309}
 
+/* bidding — ประวัติใบเดิมบนการ์ดใบใหม่ */
+.bid-hist{
+  margin:12px 20px;
+  background:rgba(239,246,255,0.8);border:1px solid #bfdbfe;
+  border-radius:var(--radius-sm);padding:9px 14px;font-size:13px;color:#1e40af;
+}
+.bid-hist-row{margin-top:3px;color:#1e3a8a}
+.bid-children{margin-top:8px;font-size:13px;color:var(--ink-soft)}
+.bid-children .status-badge{margin-left:6px}
+
 /* remark */
 .remark-row{margin:0 20px 14px;font-size:12px;color:var(--ink-soft);white-space:pre-line;
   background:rgba(255,255,255,0.55);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm)}
@@ -1965,7 +1975,7 @@ function updateSessionBar() {
 
 /* ── SUBMIT ── */
 /* ── ข้อมูลเสริมที่ยังไม่มีคอลัมน์ในชีท ฝากไว้ต้นหมายเหตุ ── */
-var META_KEYS = [['KIND','kindMeta'], ['DATE','offerDate'], ['VALID','valid'], ['FRT','freight'], ['MTC','mtPerCont'], ['FX','fx']];
+var META_KEYS = [['KIND','kindMeta'], ['DATE','offerDate'], ['VALID','valid'], ['FRT','freight'], ['MTC','mtPerCont'], ['FX','fx'], ['BID','bidFrom']];
 function buildMeta_(p) {
   var parts = META_KEYS.filter(function(k){ return p[k[1]]; })
                        .map(function(k){ return k[0] + ': ' + String(p[k[1]]).replace(/[|\]]/g, ' '); });
@@ -1996,6 +2006,8 @@ function submitForm() {
     (sess.products || []).forEach(function(p) {
       p.kindMeta = offerKind === 'idea' ? 'idea' : '';
       if (offerKind === 'idea') { p.offerDate = ''; p.valid = ''; }
+      // ใบ bidding จำ REF ใบเดิมไว้ใน meta — ทีมขายแก้หมายเหตุได้อิสระ แต่แก้ช่องนี้ไม่ได้
+      p.bidFrom = window._supersedeOnSubmit ? window._supersedeOnSubmit.ref : '';
     });
   });
 
@@ -2215,10 +2227,10 @@ function gRaw_(row, key) { return (row[key] == null ? '' : row[key]).toString().
 
 /* แกะข้อมูลเสริมที่ฝังไว้ต้นหมายเหตุ ออกมาเป็นช่องแยก */
 function stripMeta_(txt) {
-  var out = { text: txt || '', kind: '', date: '', valid: '', freight: '', mtPerCont: '', fx: '' };
+  var out = { text: txt || '', kind: '', date: '', valid: '', freight: '', mtPerCont: '', fx: '', bidFrom: '' };
   var m = (txt || '').match(/^\s*\[([^\]]*)\]\s*/);
   if (!m) return out;
-  var keyOf = { KIND:'kind', DATE:'date', VALID:'valid', FRT:'freight', MTC:'mtPerCont', FX:'fx' };
+  var keyOf = { KIND:'kind', DATE:'date', VALID:'valid', FRT:'freight', MTC:'mtPerCont', FX:'fx', BID:'bidFrom' };
   m[1].split('|').forEach(function(seg) {
     var kv = seg.split(':');
     if (kv.length < 2) return;
@@ -2330,6 +2342,7 @@ function parseSheetRows(rows) {
       qtyMonth:   g(row, 'Quantity per Month (MT)'),
       remark:     meta_.text,
       offerKind:  meta_.kind === 'idea' ? 'idea' : 'offer',
+      bidFrom:    meta_.bidFrom,
       offerDate:  meta_.date,
       valid:      meta_.valid,
       freight:    meta_.freight,
@@ -2852,6 +2865,47 @@ function fmtPrice_(v) {
   return /^[\d.,]+$/.test(t) ? '$' + t + '/MT' : t;
 }
 
+/* ── bidding: จับคู่ใบใหม่กับใบเดิม ──
+   ใบที่ส่งตั้งแต่ 17 ก.ย. 2026 เก็บ REF เดิมใน meta `BID:` ซึ่งทีมขายแก้ไม่ได้
+   ใบก่อนหน้านั้นไม่มี meta นี้ จึงถอยไปอ่านหมายเหตุ "ต่อรองจาก SFD-…" ที่ reviseOffer() เติมให้
+   — แต่ทีมขายลบข้อความนี้ทิ้งได้ (เกิดจริงกับ 5949 ที่มาจาก 7869) ใบแบบนั้นจับคู่ไม่ได้ */
+function bidParentRef_(d) {
+  if (d && d.bidFrom) return d.bidFrom;
+  var m = String((d && d.remark) || '').match(/ต่อรองจาก\s+(SFD-\d{4}-\d+)/);
+  return m ? m[1] : '';
+}
+function bidChildren_(ref) {
+  return DATA.filter(function(x){ return x.ref !== ref && bidParentRef_(x) === ref; });
+}
+/* ใบเดิมจบเรื่องแล้ว = มีใบใหม่ที่อนุมัติครบ (หรือไปไกลกว่านั้น) — ซ่อนจากแท็บ bidding
+   ใบใหม่ที่ยังรออนุมัติ ถูกปฏิเสธ หรือถูกลบ ไม่นับ ใบเดิมยังอยู่ให้กด "ยกเลิก bidding" ได้ */
+var BID_DONE = ['approved', 'idea-given', 'closed-won', 'closed-lost', 'not-offered'];
+function biddingDone_(ref) {
+  return bidChildren_(ref).some(function(x){ return BID_DONE.indexOf(getStatus(x.ref)) !== -1; });
+}
+function inFilter_(d, f) {
+  var st = getStatus(d.ref);
+  if (st !== f) return false;
+  return !(f === 'superseded' && biddingDone_(d.ref));
+}
+/* กล่องบนการ์ดใบใหม่ — ใบเดิมไม่อยู่ในแท็บ bidding แล้ว ราคาตั้งต้นต้องเห็นจากตรงนี้ */
+function bidHistory_(d) {
+  var pref = bidParentRef_(d);
+  if (!pref || pref === d.ref) return '';
+  var p = DATA.filter(function(x){ return x.ref === pref; })[0];
+  if (!p) return '<div class="bid-hist"><b>Bidding จาก ' + pref + '</b></div>';
+  var used = approvedPrice_(p.ref, p);
+  var changed = used && p.offerPrice && numOf(used) !== numOf(p.offerPrice);
+  return '<div class="bid-hist"><b>Bidding จาก ' + pref + '</b>' + (p.ts ? ' · ส่งเมื่อ ' + p.ts : '') +
+    '<div class="bid-hist-row">ใบเดิมเสนอ <b>' + (fmtPrice_(p.offerPrice) || '—') + '</b>' +
+      (!changed ? ' · อนุมัติตามที่เสนอ'
+        // ผู้อนุมัติพิมพ์ข้อความแทนตัวเลขได้ (เช่น "ไม่เสนอ", "heart 2950, neck meat ok") — ยกมาตามที่พิมพ์
+        : numOf(used) ? ' · อนุมัติที่ <b>' + fmtPrice_(used) + '</b>'
+        : ' · ผู้อนุมัติระบุราคาว่า "<b>' + used + '</b>"') +
+      (d.offerPrice ? ' → ใบนี้เสนอ <b>' + fmtPrice_(d.offerPrice) + '</b>' : '') +
+    '</div></div>';
+}
+
 /* กล่องบอกราคาที่อนุมัติ — ขึ้นเมื่อมีผู้อนุมัติกรอกราคาไว้อย่างน้อยหนึ่งคน */
 /* หมายเหตุที่ผู้อนุมัติเขียนไว้ตอนเคาะ — หน้าเช็คสถานะไม่เคยแสดงเลย
    ทั้งที่มักเป็นเงื่อนไขที่ทีมขายต้องรู้ เช่น "ยืนได้ถึงสิ้นเดือน" */
@@ -3352,7 +3406,7 @@ function renderCards() {
   }
   var filt = (curFilter === 'ext-pending')
     ? data.filter(function(d){ var a = approvals[d.ref] || {}; return a.extState === 'pending' && getStatus(d.ref) === 'approved'; })
-    : data.filter(function(d){ return getStatus(d.ref) === curFilter; });
+    : data.filter(function(d){ return inFilter_(d, curFilter); });
 
   var cnt = function(st){ return data.filter(function(d){ return getStatus(d.ref) === st; }).length; };
   var live = data.filter(function(d){ return getStatus(d.ref) !== 'deleted'; });
@@ -3565,6 +3619,12 @@ function renderCards() {
         '<div class="slot-label">ปิดเป็น bidding</div>' +
         '<div class="vote-result notoffer">ใบนี้ถูกแทนที่ด้วยใบใหม่แล้ว' +
           '<button class="btn-undo" onclick="undoBidding(\'' + d.ref + '\')">ยกเลิก bidding</button></div>' +
+        (function(){
+          var kids = bidChildren_(d.ref);
+          return '<div class="bid-children">' + (kids.length
+            ? 'ใบใหม่: ' + kids.map(function(x){ return '<b>' + x.ref + '</b>' + badge(getStatus(x.ref)); }).join(' · ')
+            : 'ยังไม่พบใบใหม่ที่อ้างถึงใบนี้') + '</div>';
+        })() +
         (av.supersededReason ? '<div class="close-remark-note"><b>เหตุผล:</b> ' + av.supersededReason + '</div>' : '') +
         '<div class="trash-note">ถ้าใบใหม่ไม่ได้ถูกส่งจริง กด "ยกเลิก bidding" เพื่อเอาใบนี้กลับไปรอปิดการขาย</div>' +
       '</div></div>';
@@ -3682,6 +3742,7 @@ function renderCards() {
         '<div class="card-status-area">' + badge(status) + '<div class="card-ts">' + (d.ts || '—') + '</div></div>' +
       '</div>' +
       offerDetail +
+      bidHistory_(d) +
       '<div class="card-products">' +
         '<div class="prod-lbl">รายการสินค้า</div>' +
         '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>Shipment</th><th>Idea Price</th><th>%Margin (Idea)</th><th>ราคาเสนอ</th></tr></thead>' +
@@ -3830,7 +3891,7 @@ function updateFilterCounts_(data) {
     'filter-superseded': 'superseded', 'filter-deleted': 'deleted',
     'filter-question': 'question'
   };
-  var count = function(st){ return data.filter(function(d){ return getStatus(d.ref) === st; }).length; };
+  var count = function(st){ return data.filter(function(d){ return inFilter_(d, st); }).length; };
   // สถานะที่ยังต้องมีคนลงมือ — เน้นสีให้เห็น
   var needsAction = window._statusMode
     ? {'approved':1, 'question':1, 'idea-given':1}   // เซลส์: ตามปิดการขาย + ตอบคำถาม + ตามผลไอเดียราคา
