@@ -2855,6 +2855,20 @@ function apPricesOf_(ref, slot, n) {
   for (var i = 0; i < n; i++) out.push(arr[i] || '');
   return out;
 }
+/* ค่ารายสินค้าต่างกันหรือเปล่า — ใช้ตัดสินว่าแถวสรุปด้านบนยกค่าเดียวมาอ้างเป็นของทั้งใบได้ไหม */
+function prodVaries_(d, key) {
+  var list = ((d && d.products) || []).map(function(p){ return String(p[key] || '').trim(); })
+                                      .filter(function(v){ return !!v; });
+  if (list.length < 2) return false;
+  for (var i = 1; i < list.length; i++) if (list[i] !== list[0]) return true;
+  return false;
+}
+/* ช่องบนแถวสรุปที่ค่าจริงต่างกันรายสินค้า — ชี้ไปดูในตารางแทนที่จะโชว์ของชิ้นแรก */
+function detailSplitCell_(label) {
+  return '<div class="detail-cell"><div class="dl">' + label + '</div>' +
+    '<div class="dv">แยกตามสินค้า<div class="dv-sub">ดูในตารางด้านล่าง</div></div></div>';
+}
+
 /* ใบนี้เคาะราคาแยกรายสินค้าไว้หรือเปล่า */
 function apHasPerProduct_(ref) {
   var a = approvals[ref] || {};
@@ -3525,6 +3539,7 @@ function renderCards() {
     var av = approvals[d.ref] || {}; var v1 = av.A1; var v2 = av.A2;
 
     var showApCol = apHasPerProduct_(d.ref);
+    var showMgOffer = (d.products || []).some(function(p){ return !!p.offerMargin; });
     var pRows = '';
     (d.products || []).forEach(function(p, pi) {
       // แสดงเฉพาะค่าของสินค้าชิ้นนั้นจริง ๆ — เดิมยืม %Margin ระดับใบมาใส่ทุกแถว
@@ -3537,6 +3552,8 @@ function renderCards() {
         '<td><span class="pv">' + (p.ideaPrice || '—') + '</span></td>' +
         '<td><span class="mg ' + mc + '">' + (p.marginIdea ? fmtMargin_(p.marginIdea) : '—') + '</span></td>' +
         '<td><span class="pv pv-offer">' + (p.offerPrice ? fmtPrice_(p.offerPrice) : '—') + '</span></td>' +
+        (showMgOffer ? '<td><span class="mg ' + mgClass(p.offerMargin) + '">' +
+          (p.offerMargin ? fmtMargin_(p.offerMargin) : '—') + '</span></td>' : '') +
         (showApCol ? (function(){
           var ap = apPriceForProduct_(d.ref, d, pi);
           return '<td><span class="pv' + (ap ? ' pv-offer' : '') + '">' +
@@ -3566,11 +3583,16 @@ function renderCards() {
             '<div class="dv dv-red">แยกตามสินค้า<div class="dv-sub">ดูคอลัมน์ "ราคาที่อนุมัติ" ในตาราง</div></div></div>'
           : '<div class="detail-cell"><div class="dl">' +
             (priceChanged_(d.ref, d) ? 'ราคาที่อนุมัติ' : (d.offerKind === 'idea' ? 'ไอเดียราคา' : 'ราคาเสนอ')) +
-            '</div><div class="dv dv-red">$' + (priceChanged_(d.ref, d) ? approvedPrice_(d.ref, d) : d.offerPrice) + '/MT' +
+            // fmtPrice_ เติม $ /MT ให้เฉพาะค่าที่เป็นตัวเลข ข้อความอย่าง "BB 2650-2700, SBL 4000-4050" แสดงตามที่พิมพ์
+            '</div><div class="dv dv-red">' + fmtPrice_(priceChanged_(d.ref, d) ? approvedPrice_(d.ref, d) : d.offerPrice) +
             (priceChanged_(d.ref, d) ? '<div class="dv-sub">เสนอไว้ ' + d.offerPrice + '</div>' : '') +
             '</div></div>') : '') +
-        (d.offerMargin ? '<div class="detail-cell"><div class="dl">%Margin</div><div class="dv ' + (mgClass(d.offerMargin) === 'mg-h' ? 'dv-green' : mgClass(d.offerMargin) === 'mg-l' ? 'dv-red' : '') + '">' + fmtMargin_(d.offerMargin) + '</div></div>' : '') +
-        (d.qtyMonth ? '<div class="detail-cell"><div class="dl">Qty/Month</div><div class="dv">' + d.qtyMonth + '</div></div>' : '') +
+        (prodVaries_(d, 'offerMargin')
+          ? detailSplitCell_('%Margin')
+          : (d.offerMargin ? '<div class="detail-cell"><div class="dl">%Margin</div><div class="dv ' + (mgClass(d.offerMargin) === 'mg-h' ? 'dv-green' : mgClass(d.offerMargin) === 'mg-l' ? 'dv-red' : '') + '">' + fmtMargin_(d.offerMargin) + '</div></div>' : '')) +
+        (prodVaries_(d, 'qty')
+          ? detailSplitCell_('Qty/Month')
+          : (d.qtyMonth ? '<div class="detail-cell"><div class="dl">Qty/Month</div><div class="dv">' + d.qtyMonth + '</div></div>' : '')) +
         (d.offerDate && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Date ที่จะเสนอ</div><div class="dv">' + d.offerDate + '</div></div>' : '') +
         (d.valid && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Valid</div><div class="dv">' + d.valid + '</div></div>' : '') +
         freightCells_(d) +
@@ -3862,8 +3884,8 @@ function renderCards() {
       bidHistory_(d) +
       '<div class="card-products">' +
         '<div class="prod-lbl">รายการสินค้า</div>' +
-        '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>Shipment</th><th>Idea Price</th><th>%Margin (Idea)</th><th>ราคาเสนอ</th>' + (showApCol ? '<th>ราคาที่อนุมัติ</th>' : '') + '</tr></thead>' +
-        '<tbody>' + (pRows || '<tr><td colspan="' + (showApCol ? 7 : 6) + '" style="text-align:center;color:#aaa;padding:14px">ไม่มีข้อมูลสินค้า</td></tr>') + '</tbody></table>' +
+        '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>Shipment</th><th>Idea Price</th><th>%Margin (Idea)</th><th>ราคาเสนอ</th>' + (showMgOffer ? '<th>%Margin (Offer)</th>' : '') + (showApCol ? '<th>ราคาที่อนุมัติ</th>' : '') + '</tr></thead>' +
+        '<tbody>' + (pRows || '<tr><td colspan="' + (6 + (showMgOffer ? 1 : 0) + (showApCol ? 1 : 0)) + '" style="text-align:center;color:#aaa;padding:14px">ไม่มีข้อมูลสินค้า</td></tr>') + '</tbody></table>' +
       '</div>' +
       hist +
       (d.remark ? '<div class="remark-row"><b>หมายเหตุ:</b> ' + d.remark + '</div>' : '') +
