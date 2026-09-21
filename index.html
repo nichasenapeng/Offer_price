@@ -749,6 +749,13 @@ body::before, body::after { display: none !important; }
 .btn-notoffer{background:#eef2f7;color:#475569;border:1.5px solid #cbd5e1}
 .btn-notoffer:hover{background:#475569;color:#fff;transform:translateY(-1px);box-shadow:0 4px 14px rgba(71,85,105,.28)}
 .vote-result.notoffer{background:#eef2f7;color:#475569;border:1px solid #cbd5e1}
+.ap-price-multi{display:flex;flex-direction:column;gap:6px}
+.ap-price-one{display:flex;align-items:center;gap:8px}
+.ap-price-name{flex:1;min-width:0;font-size:12px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ap-price-one .close-input{flex:0 0 42%}
+.ap-price-hint{font-weight:400;color:var(--ink-soft)}
+.ap-price-list{margin-top:4px;font-size:13px}
+.ap-price-list div{margin-top:2px}
 .btn-idea{background:#FEF3C7;color:#8a5a08;border:1.5px solid #f0c76b}
 .btn-idea:hover{background:#8a5a08;color:#fff;transform:translateY(-1px);box-shadow:0 4px 14px rgba(138,90,8,.28)}
 .idea-note{margin-bottom:14px;padding:10px 14px;border-radius:10px;background:#FEF3C7;color:#8a5a08;border:1px solid #f0c76b;font-size:14px}
@@ -2822,6 +2829,43 @@ function stripApMeta_(txt) {
   return out;
 }
 
+/* ── ราคาที่อนุมัติแบบรายสินค้า ──
+   ใบที่มีหลายสินค้ามีช่องราคาระดับใบช่องเดียว ผู้อนุมัติจึงเคยต้องพิมพ์รวมกันมาในช่องเดียว
+   (เช่น "BB 2650-2700, SBL 4000-4050") แล้วการ์ดก็โชว์เป็นก้อนเดียวแบบนั้น
+   ตอนนี้เก็บหลายค่าในช่องเดิม คั่นด้วย ;; เรียงตามลำดับสินค้าในใบ
+   ค่าที่ไม่มี ;; = ราคาเดียวของทั้งใบแบบเดิม ใบเก่าทุกใบจึงอ่านได้เหมือนเดิม
+   ไม่ต้องแก้ Apps Script เพราะยังเขียนลงช่อง หมายเหตุ A1/A2 ช่องเดิม */
+var AP_SEP = ' ;; ';
+function apIsPerProduct_(v) { return String(v || '').indexOf(';;') !== -1; }
+function apSplit_(v) {
+  return String(v || '').split(';;').map(function(x){ return x.trim(); });
+}
+/* n = จำนวนสินค้าในใบ — ใบสินค้าเดียวเก็บเป็นค่าเดี่ยวเหมือนเดิม ไม่มี ;; โผล่ในชีท */
+function apJoin_(list, n) {
+  var out = list.map(function(x){ return String(x || '').trim().replace(/;/g, ' '); });
+  var any = out.some(function(x){ return !!x; });
+  if (!any) return '';
+  if (n <= 1) return out[0] || '';
+  return out.join(AP_SEP);
+}
+function apPricesOf_(ref, slot, n) {
+  var raw = (approvals[ref] || {})[slot === 'A1' ? 'apPriceA1' : 'apPriceA2'] || '';
+  var arr = apIsPerProduct_(raw) ? apSplit_(raw) : (n <= 1 ? [String(raw).trim()] : []);
+  var out = [];
+  for (var i = 0; i < n; i++) out.push(arr[i] || '');
+  return out;
+}
+/* ใบนี้เคาะราคาแยกรายสินค้าไว้หรือเปล่า */
+function apHasPerProduct_(ref) {
+  var a = approvals[ref] || {};
+  return apIsPerProduct_(a.apPriceA2) || apIsPerProduct_(a.apPriceA1);
+}
+/* ราคาที่อนุมัติของสินค้าชิ้นที่ i — ยึดของ A2 ก่อนเหมือนราคาระดับใบ */
+function apPriceForProduct_(ref, d, i) {
+  var n = ((d && d.products) || []).length || 1;
+  return apPricesOf_(ref, 'A2', n)[i] || apPricesOf_(ref, 'A1', n)[i] || '';
+}
+
 /* ราคาที่ใช้จริงหลังอนุมัติ — ยึดของ A2 ก่อน ถ้า A2 ไม่ได้กรอกก็ใช้ของ A1
    ไม่มีใครกรอกเลย = อนุมัติตามราคาที่เสนอมา */
 function approvedPrice_(ref, d) {
@@ -2830,6 +2874,7 @@ function approvedPrice_(ref, d) {
 }
 /* ราคาที่อนุมัติต่างจากที่เสนอไว้หรือไม่ */
 function priceChanged_(ref, d) {
+  if (apHasPerProduct_(ref)) return false;   // เคาะแยกรายสินค้า — ราคาระดับใบไม่มีความหมาย
   var ap = approvedPrice_(ref, d);
   if (!ap || !d || !d.offerPrice) return false;
   return numOf(ap) !== numOf(d.offerPrice);
@@ -2944,6 +2989,15 @@ function apPriceBox_(d) {
     return '<div class="ap-price-box">อนุมัติตามราคาที่เสนอ: <b>' + fmtPrice_(d.offerPrice) + '</b></div>';
   }
 
+  if (apHasPerProduct_(d.ref)) {
+    var prods_ = d.products || [];
+    return '<div class="ap-price-box">ราคาที่อนุมัติ (แยกตามสินค้า)' +
+      '<div class="ap-price-list">' + prods_.map(function(pp, pi) {
+        var ap = apPriceForProduct_(d.ref, d, pi);
+        return '<div>• ' + (pp.type || ('สินค้าที่ ' + (pi + 1))) + ': <b>' +
+          (ap ? fmtPrice_(ap) : 'ตามที่เสนอ ' + (pp.offerPrice ? fmtPrice_(pp.offerPrice) : '—')) + '</b></div>';
+      }).join('') + '</div></div>';
+  }
   var used = approvedPrice_(d.ref, d);
   var clash = p1 && p2 && numOf(p1) !== numOf(p2);
   var same  = d.offerPrice && numOf(used) === numOf(d.offerPrice);
@@ -3273,10 +3327,24 @@ function undoClose(ref) {
 }
 
 // ── VOTE ──
+/* Approve 2 อนุมัติ = จบใบเลย ไม่ต้องรอ Approve 1 กด (ทีมขอไว้ 21 ก.ย. 2026)
+   เติมให้เฉพาะช่องที่ยังว่าง — ถ้า Approve 1 เคยกดอนุมัติ/ปฏิเสธไว้แล้ว ต้องไม่ไปทับของเขา
+   ชีทเก็บได้แค่คำว่า approved เหมือนกดเอง จึงเขียนหมายเหตุกำกับไว้ว่าเป็นการเติมอัตโนมัติ */
+var AUTO_A1_NOTE = 'อนุมัติอัตโนมัติพร้อม Approve 2';
 function vote(ref, slot, dec) {
   if (!curKey) { showToast('กรุณาเข้าสู่ระบบก่อน'); return; }
   if (!approvals[ref]) approvals[ref] = {};
   approvals[ref][slot] = dec;
+  var autoA1 = (slot === 'A2' && dec === 'approved' && !approvals[ref].A1);
+  if (autoA1) {
+    approvals[ref].A1 = 'approved';
+    var a1El = document.getElementById('rem-A1-' + ref);
+    var a1Txt = (a1El ? a1El.value : (approvals[ref].remarkA1 || '')).trim();
+    if (!a1Txt) {
+      approvals[ref].remarkA1 = AUTO_A1_NOTE;
+      if (a1El) a1El.value = AUTO_A1_NOTE;
+    }
+  }
   // ตัดสินใจแล้ว = คำถามจบ
   delete approvals[ref].question;
   delete approvals[ref].questionReply;
@@ -3289,10 +3357,9 @@ function vote(ref, slot, dec) {
   var remA2El = document.getElementById('rem-A2-' + ref);
 
   // ราคาที่ผู้อนุมัติเคาะ — เก็บเฉพาะตอน Approve (Reject/คำถามไม่ต้องมีราคา)
-  var apEl = document.getElementById('ap-' + slot + '-' + ref);
   var apKey = slot === 'A1' ? 'apPriceA1' : 'apPriceA2';
   if (dec === 'approved') {
-    var apRaw = apEl ? apEl.value.trim().replace(/[|\]]/g, ' ') : '';
+    var apRaw = readApPriceInput_(ref, slot) || '';
     if (apRaw) av[apKey] = apRaw; else delete av[apKey];
   } else {
     delete av[apKey];
@@ -3331,11 +3398,32 @@ function vote(ref, slot, dec) {
     body: JSON.stringify(payload)
   }).catch(function(){});  // silent fail — approval ยังทำงานใน UI
 
-  showToast(dec === 'approved' ? '' + slot + ' อนุมัติสำเร็จ — บันทึกแล้ว' : '' + slot + ' ปฏิเสธ — บันทึกแล้ว', dec === 'approved' ? 'green' : 'red');
+  showToast(dec === 'approved'
+      ? (autoA1 ? 'A2 อนุมัติสำเร็จ — Approve 1 อนุมัติให้อัตโนมัติ ใบนี้อนุมัติครบแล้ว'
+                : '' + slot + ' อนุมัติสำเร็จ — บันทึกแล้ว')
+      : '' + slot + ' ปฏิเสธ — บันทึกแล้ว', dec === 'approved' ? 'green' : 'red');
   renderCards();
 }
 
 /* แก้ราคาที่อนุมัติของใบที่โหวตไปแล้ว โดยไม่ต้องยกเลิกโหวต */
+/* อ่านราคาที่พิมพ์ไว้ในช่องของผู้อนุมัติ คืนเป็นสตริงเดียวพร้อมเก็บ (มี ;; ถ้าหลายสินค้า) */
+function readApPriceInput_(ref, slot) {
+  var d = DATA.filter(function(x){ return x.ref === ref; })[0] || {};
+  var n = (d.products || []).length || 1;
+  var clean = function(v){ return String(v || '').trim().replace(/[|\]]/g, ' '); };
+  if (n <= 1) {
+    var one = document.getElementById('ap-' + slot + '-' + ref);
+    return one ? clean(one.value) : null;
+  }
+  var list = [], found = false;
+  for (var i = 0; i < n; i++) {
+    var el = document.getElementById('ap-' + slot + '-' + ref + '-' + i);
+    if (el) found = true;
+    list.push(el ? clean(el.value) : '');
+  }
+  return found ? apJoin_(list, n) : null;
+}
+
 function saveApprovedPrice(ref, slot) {
   if (!curKey) { showToast('กรุณาเข้าสู่ระบบก่อน'); return; }
   var st = getStatus(ref);
@@ -3343,13 +3431,12 @@ function saveApprovedPrice(ref, slot) {
     showToast('แก้ราคาที่อนุมัติได้เฉพาะก่อนปิดการขาย', 'red');
     return;
   }
-  var el = document.getElementById('ap-' + slot + '-' + ref);
-  if (!el) return;
+  var v = readApPriceInput_(ref, slot);
+  if (v === null) return;
   if (!approvals[ref]) approvals[ref] = {};
   var av = approvals[ref];
   if (!av[slot]) { showToast('ช่องนี้ยังไม่ได้กด Approve', 'red'); return; }
   var key = slot === 'A1' ? 'apPriceA1' : 'apPriceA2';
-  var v = el.value.trim().replace(/[|\]]/g, ' ');
   if (v) av[key] = v; else delete av[key];
   saveRemarks();
   // สถานะรวมอาจกำลังถือคำขอขยาย VALID อยู่ อย่าเขียนทับให้หาย
@@ -3437,8 +3524,9 @@ function renderCards() {
     var status = getStatus(d.ref);
     var av = approvals[d.ref] || {}; var v1 = av.A1; var v2 = av.A2;
 
+    var showApCol = apHasPerProduct_(d.ref);
     var pRows = '';
-    (d.products || []).forEach(function(p) {
+    (d.products || []).forEach(function(p, pi) {
       // แสดงเฉพาะค่าของสินค้าชิ้นนั้นจริง ๆ — เดิมยืม %Margin ระดับใบมาใส่ทุกแถว
       // ทำให้ดูเหมือนทุกสินค้ามีค่าเท่ากัน ทั้งที่เป็นตัวเลขของทั้งใบตัวเดียว
       var mc = mgClass(p.marginIdea);
@@ -3449,6 +3537,11 @@ function renderCards() {
         '<td><span class="pv">' + (p.ideaPrice || '—') + '</span></td>' +
         '<td><span class="mg ' + mc + '">' + (p.marginIdea ? fmtMargin_(p.marginIdea) : '—') + '</span></td>' +
         '<td><span class="pv pv-offer">' + (p.offerPrice ? fmtPrice_(p.offerPrice) : '—') + '</span></td>' +
+        (showApCol ? (function(){
+          var ap = apPriceForProduct_(d.ref, d, pi);
+          return '<td><span class="pv' + (ap ? ' pv-offer' : '') + '">' +
+            (ap ? fmtPrice_(ap) : (p.offerPrice ? 'ตามที่เสนอ' : '—')) + '</span></td>';
+        })() : '') +
         '</tr>';
     });
 
@@ -3467,11 +3560,15 @@ function renderCards() {
     if (d.period || d.offerPrice || d.offerMargin || d.qtyMonth || d.offerDate || d.valid || d.freight) {
       offerDetail = '<div class="offer-detail">' +
         (d.period ? '<div class="detail-cell"><div class="dl">Shipment ที่เสนอ</div><div class="dv">' + d.period + '</div></div>' : '') +
-        (d.offerPrice ? '<div class="detail-cell"><div class="dl">' +
-          (priceChanged_(d.ref, d) ? 'ราคาที่อนุมัติ' : (d.offerKind === 'idea' ? 'ไอเดียราคา' : 'ราคาเสนอ')) +
-          '</div><div class="dv dv-red">$' + (priceChanged_(d.ref, d) ? approvedPrice_(d.ref, d) : d.offerPrice) + '/MT' +
-          (priceChanged_(d.ref, d) ? '<div class="dv-sub">เสนอไว้ ' + d.offerPrice + '</div>' : '') +
-          '</div></div>' : '') +
+        (d.offerPrice ? (apHasPerProduct_(d.ref)
+          // เคาะแยกรายสินค้าแล้ว ราคาก้อนเดียวตรงนี้ไม่ได้แทนทั้งใบ ชี้ไปดูในตารางแทน
+          ? '<div class="detail-cell"><div class="dl">ราคาที่อนุมัติ</div>' +
+            '<div class="dv dv-red">แยกตามสินค้า<div class="dv-sub">ดูคอลัมน์ "ราคาที่อนุมัติ" ในตาราง</div></div></div>'
+          : '<div class="detail-cell"><div class="dl">' +
+            (priceChanged_(d.ref, d) ? 'ราคาที่อนุมัติ' : (d.offerKind === 'idea' ? 'ไอเดียราคา' : 'ราคาเสนอ')) +
+            '</div><div class="dv dv-red">$' + (priceChanged_(d.ref, d) ? approvedPrice_(d.ref, d) : d.offerPrice) + '/MT' +
+            (priceChanged_(d.ref, d) ? '<div class="dv-sub">เสนอไว้ ' + d.offerPrice + '</div>' : '') +
+            '</div></div>') : '') +
         (d.offerMargin ? '<div class="detail-cell"><div class="dl">%Margin</div><div class="dv ' + (mgClass(d.offerMargin) === 'mg-h' ? 'dv-green' : mgClass(d.offerMargin) === 'mg-l' ? 'dv-red' : '') + '">' + fmtMargin_(d.offerMargin) + '</div></div>' : '') +
         (d.qtyMonth ? '<div class="detail-cell"><div class="dl">Qty/Month</div><div class="dv">' + d.qtyMonth + '</div></div>' : '') +
         (d.offerDate && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Date ที่จะเสนอ</div><div class="dv">' + d.offerDate + '</div></div>' : '') +
@@ -3505,19 +3602,39 @@ function renderCards() {
         var apKey = slot === 'A1' ? 'apPriceA1' : 'apPriceA2';
         var apVal = (approvals[d.ref] || {})[apKey] || '';
         var apId  = 'ap-' + slot + '-' + d.ref;
+        var prods = d.products || [];
+        var nProd = prods.length || 1;
+        var enterJs = 'if(event.key===\'Enter\'){event.preventDefault();saveApprovedPrice(\'' + d.ref + '\',\'' + slot + '\')}';
+        // ใบหลายสินค้า: ช่องละสินค้า เรียงตามตารางข้างบน — เว้นว่างช่องไหน = อนุมัติตามราคาที่เสนอของชิ้นนั้น
+        var priceInputs;
+        if (nProd > 1) {
+          var vals = apPricesOf_(d.ref, slot, nProd);
+          priceInputs = '<div class="ap-price-multi">' + prods.map(function(pp, pi) {
+            return '<div class="ap-price-one">' +
+              '<span class="ap-price-name">' + (pp.type || ('สินค้าที่ ' + (pi + 1))) + '</span>' +
+              '<input id="' + apId + '-' + pi + '" class="close-input" type="text" inputmode="decimal"' +
+              ' placeholder="' + (pp.offerPrice ? 'เสนอมา ' + pp.offerPrice : 'เว้นว่าง = ตามที่เสนอ') + '"' +
+              ' value="' + vals[pi] + '"' +
+              ' onkeydown="' + enterJs + '">' +
+            '</div>';
+          }).join('') + '</div>';
+        } else {
+          priceInputs = '<input id="' + apId + '" class="close-input" type="text" inputmode="decimal"' +
+            ' placeholder="' + (d.offerPrice ? 'เสนอมา ' + d.offerPrice + ' — เว้นว่าง = อนุมัติตามนี้' : 'เว้นว่าง = อนุมัติตามราคาที่เสนอ') + '"' +
+            ' value="' + apVal + '"' +
+            ' onkeydown="' + enterJs + '">';
+        }
         return '<div class="vote-slot-wrap">' +
           '<div class="slot-label">' + label + '</div>' +
           voteArea +
-          '<div class="close-field ap-price-field"><label>ราคาที่อนุมัติ (USD/MT)</label>' +
-            '<input id="' + apId + '" class="close-input" type="text" inputmode="decimal"' +
-            ' placeholder="' + (d.offerPrice ? 'เสนอมา ' + d.offerPrice + ' — เว้นว่าง = อนุมัติตามนี้' : 'เว้นว่าง = อนุมัติตามราคาที่เสนอ') + '"' +
-            ' value="' + apVal + '"' +
-            ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();saveApprovedPrice(\'' + d.ref + '\',\'' + slot + '\')}">' +
+          '<div class="close-field ap-price-field"><label>ราคาที่อนุมัติ (USD/MT)' +
+            (nProd > 1 ? ' <span class="ap-price-hint">— แยกตามสินค้า</span>' : '') + '</label>' +
+            priceInputs +
             // โหวตไปแล้วก็ยังแก้ราคาได้ ไม่ต้องยกเลิกโหวตก่อน
             (dec ? '<button class="btn-undo ap-save" onclick="saveApprovedPrice(\'' + d.ref + '\',\'' + slot + '\')">บันทึกราคา</button>' : '') +
             (function(){
               // ใบเก่าที่พิมพ์ราคาไว้ในหมายเหตุ เสนอให้กดใช้เลย
-              if (dec !== 'approved' || apVal) return '';
+              if (dec !== 'approved' || apVal || nProd > 1) return '';
               var h = priceFromRemark_(remVal);
               if (!h || (d.offerPrice && numOf(h) === numOf(d.offerPrice))) return '';
               return '<button class="btn-undo ap-hint" onclick="useHintedPrice(\'' + d.ref + '\',\'' + slot + '\',\'' + h + '\')"' +
@@ -3745,8 +3862,8 @@ function renderCards() {
       bidHistory_(d) +
       '<div class="card-products">' +
         '<div class="prod-lbl">รายการสินค้า</div>' +
-        '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>Shipment</th><th>Idea Price</th><th>%Margin (Idea)</th><th>ราคาเสนอ</th></tr></thead>' +
-        '<tbody>' + (pRows || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:14px">ไม่มีข้อมูลสินค้า</td></tr>') + '</tbody></table>' +
+        '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>Shipment</th><th>Idea Price</th><th>%Margin (Idea)</th><th>ราคาเสนอ</th>' + (showApCol ? '<th>ราคาที่อนุมัติ</th>' : '') + '</tr></thead>' +
+        '<tbody>' + (pRows || '<tr><td colspan="' + (showApCol ? 7 : 6) + '" style="text-align:center;color:#aaa;padding:14px">ไม่มีข้อมูลสินค้า</td></tr>') + '</tbody></table>' +
       '</div>' +
       hist +
       (d.remark ? '<div class="remark-row"><b>หมายเหตุ:</b> ' + d.remark + '</div>' : '') +
