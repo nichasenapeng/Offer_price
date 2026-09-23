@@ -915,6 +915,11 @@ body::before, body::after { display: none !important; }
 #approve-app .ap-note.ok span{color:var(--green)}
 #approve-app .ap-note.no{background:rgba(246,235,239,0.85);border:1px solid var(--red)}
 #approve-app .ap-note.no span{color:var(--red)}
+#approve-app .ap-votes{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 12px;font-size:13px;color:var(--ink-soft)}
+#approve-app .ap-vote b{font-weight:600}
+#approve-app .ap-vote.ok b{color:var(--green)}
+#approve-app .ap-vote.no b{color:var(--red)}
+#approve-app .ap-vote.wait b{color:#a07a00}
 #approve-app .rej-reasons{margin-top:10px;display:flex;flex-direction:column;gap:8px}
 #approve-app .rej-reason{font-size:13px;color:var(--ink-soft);background:rgba(246,235,239,0.85);border:1px solid var(--red);border-radius:var(--radius-sm);padding:9px 13px}
 #approve-app .rej-reason span{display:block;font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
@@ -2297,6 +2302,8 @@ function parseSheetRows(rows) {
       products = row.products.map(function(p) {
         var ip = cleanCell_(p['Idea Price']);
         var ipDisplay = ip ? (ip.indexOf('$') === 0 ? ip : '$' + ip) : '';
+        // DATE / VALID ของแต่ละสินค้าฝังอยู่ในหมายเหตุของแถวนั้น — มีเมื่อ Apps Script ส่ง 'หมายเหตุ' มาด้วย
+        var pm = stripMeta_(cleanCell_(p['หมายเหตุ'] || ''));
         return {
           type:       cleanCell_(p['Product']),
           spec:       cleanCell_(p['Specification']),
@@ -2306,7 +2313,12 @@ function parseSheetRows(rows) {
           marginIdea: cleanCell_(p['%Margin (Idea)']),
           // ราคาเสนอรายสินค้า — จะมีก็ต่อเมื่อ Apps Script ส่งมาให้ (ยังไม่ส่งในเวอร์ชันปัจจุบัน)
           offerPrice:  cleanCell_(p['ราคาเสนอ (USD/MT)'] || p['offerPrice'] || ''),
-          offerMargin: cleanCell_(p['%Margin (Offer)'] || p['offerMargin'] || '')
+          offerMargin: cleanCell_(p['%Margin (Offer)'] || p['offerMargin'] || ''),
+          // สามช่องนี้ว่างจนกว่า Apps Script จะส่ง 'Shipment ที่จะเสนอ' กับ 'หมายเหตุ' ต่อสินค้ามา
+          // ว่าง = prodVaries_ ไม่นับ แถวสรุปจึงแสดงค่าระดับใบแบบเดิม
+          period:      fmtShipment_(p['Shipment ที่จะเสนอ'] || ''),
+          offerDate:   pm.date,
+          valid:       pm.valid
         };
       });
     } else {
@@ -2980,6 +2992,17 @@ function approverNotes_(d) {
   return rows ? '<div class="ap-notes">' + rows + '</div>' : '';
 }
 
+/* หน้าเช็คสถานะไม่มีช่องโหวต — บรรทัดนี้บอกว่า Approve 1 / 2 แต่ละคนกดอะไรไปแล้ว */
+function apVoteLine_(d) {
+  var a = approvals[d.ref] || {};
+  var one = function(slot, v) {
+    var cls = v === 'approved' ? 'ok' : v === 'rejected' ? 'no' : 'wait';
+    var txt = v === 'approved' ? '✓ อนุมัติ' : v === 'rejected' ? '✗ ปฏิเสธ' : '⏳ รอ';
+    return '<span class="ap-vote ' + cls + '">Approve ' + slot + ' <b>' + txt + '</b></span>';
+  };
+  return '<div class="ap-votes">' + one('1', a.A1) + one('2', a.A2) + '</div>';
+}
+
 function apPriceBox_(d) {
   var a = approvals[d.ref] || {};
   // ยังไม่มีใครอนุมัติ ก็ยังไม่มีราคาที่อนุมัติให้พูดถึง
@@ -3186,9 +3209,10 @@ function reviseOffer(ref, mode) {
       lastOffer:  idx === 0 ? (d.lastOffer || '') : '',
       currency:   idx === 0 ? (d.currency || '') : '',
       other:      idx === 0 ? (d.other || '') : '',
-      period: d.period || '', offerPrice: d.offerPrice || '',
-      offerMargin: d.offerMargin || '', qtyMonth: d.qtyMonth || '',
-      offerDate: d.offerDate || '', valid: d.valid || '',
+      // ค่าที่มีรายสินค้าใช้ของชิ้นนั้นก่อน ไม่มีจึงถอยไปใช้ค่าระดับใบ (ใบเก่า / Apps Script ยังไม่ส่งมา)
+      period: p.period || d.period || '', offerPrice: p.offerPrice || d.offerPrice || '',
+      offerMargin: p.offerMargin || d.offerMargin || '', qtyMonth: d.qtyMonth || '',
+      offerDate: p.offerDate || d.offerDate || '', valid: p.valid || d.valid || '',
       freight: d.freight || '', mtPerCont: d.mtPerCont || '', fx: d.fx || ''
     });
   });
@@ -3540,6 +3564,12 @@ function renderCards() {
 
     var showApCol = apHasPerProduct_(d.ref);
     var showMgOffer = (d.products || []).some(function(p){ return !!p.offerMargin; });
+    // Shipment ที่เสนอ / Date / Valid รายสินค้า — ขึ้นเฉพาะตอนที่แถวสรุปบอกว่า "แยกตามสินค้า"
+    // ถ้าทุกชิ้นเท่ากัน แถวสรุปแสดงค่าเดียวอยู่แล้ว ไม่ต้องซ้ำในตาราง
+    var showPeriod = prodVaries_(d, 'period');
+    var showDate   = d.offerKind !== 'idea' && prodVaries_(d, 'offerDate');
+    var showValid  = d.offerKind !== 'idea' && prodVaries_(d, 'valid');
+    var extraCols  = (showMgOffer ? 1 : 0) + (showApCol ? 1 : 0) + (showPeriod ? 1 : 0) + (showDate ? 1 : 0) + (showValid ? 1 : 0);
     var pRows = '';
     (d.products || []).forEach(function(p, pi) {
       // แสดงเฉพาะค่าของสินค้าชิ้นนั้นจริง ๆ — เดิมยืม %Margin ระดับใบมาใส่ทุกแถว
@@ -3559,6 +3589,9 @@ function renderCards() {
           return '<td><span class="pv' + (ap ? ' pv-offer' : '') + '">' +
             (ap ? fmtPrice_(ap) : (p.offerPrice ? 'ตามที่เสนอ' : '—')) + '</span></td>';
         })() : '') +
+        (showPeriod ? '<td style="color:#555">' + (p.period || '—') + '</td>' : '') +
+        (showDate   ? '<td style="color:#555">' + (p.offerDate || '—') + '</td>' : '') +
+        (showValid  ? '<td style="color:#555">' + (p.valid || '—') + '</td>' : '') +
         '</tr>';
     });
 
@@ -3576,7 +3609,9 @@ function renderCards() {
     var offerDetail = '';
     if (d.period || d.offerPrice || d.offerMargin || d.qtyMonth || d.offerDate || d.valid || d.freight) {
       offerDetail = '<div class="offer-detail">' +
-        (d.period ? '<div class="detail-cell"><div class="dl">Shipment ที่เสนอ</div><div class="dv">' + d.period + '</div></div>' : '') +
+        (prodVaries_(d, 'period')
+          ? detailSplitCell_('Shipment ที่เสนอ')
+          : (d.period ? '<div class="detail-cell"><div class="dl">Shipment ที่เสนอ</div><div class="dv">' + d.period + '</div></div>' : '')) +
         (d.offerPrice ? (apHasPerProduct_(d.ref)
           // เคาะแยกรายสินค้าแล้ว ราคาก้อนเดียวตรงนี้ไม่ได้แทนทั้งใบ ชี้ไปดูในตารางแทน
           ? '<div class="detail-cell"><div class="dl">ราคาที่อนุมัติ</div>' +
@@ -3593,8 +3628,12 @@ function renderCards() {
         (prodVaries_(d, 'qty')
           ? detailSplitCell_('Qty/Month')
           : (d.qtyMonth ? '<div class="detail-cell"><div class="dl">Qty/Month</div><div class="dv">' + d.qtyMonth + '</div></div>' : '')) +
-        (d.offerDate && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Date ที่จะเสนอ</div><div class="dv">' + d.offerDate + '</div></div>' : '') +
-        (d.valid && d.offerKind !== 'idea' ? '<div class="detail-cell"><div class="dl">Valid</div><div class="dv">' + d.valid + '</div></div>' : '') +
+        (d.offerKind === 'idea' ? '' : prodVaries_(d, 'offerDate')
+          ? detailSplitCell_('Date ที่จะเสนอ')
+          : (d.offerDate ? '<div class="detail-cell"><div class="dl">Date ที่จะเสนอ</div><div class="dv">' + d.offerDate + '</div></div>' : '')) +
+        (d.offerKind === 'idea' ? '' : prodVaries_(d, 'valid')
+          ? detailSplitCell_('Valid')
+          : (d.valid ? '<div class="detail-cell"><div class="dl">Valid</div><div class="dv">' + d.valid + '</div></div>' : '')) +
         freightCells_(d) +
         (d.totalQty ? '<div class="detail-cell"><div class="dl">Total Qty</div><div class="dv">' + d.totalQty + '</div></div>' : '') +
         '</div>';
@@ -3857,6 +3896,7 @@ function renderCards() {
           '</div>';
       }
       approveHtml = '<div class="approve-section"><div class="vote-slot-wrap" style="padding-left:0">' +
+        apVoteLine_(d) +
         apPriceBox_(d) +
         approverNotes_(d) +
         negotiate +
@@ -3884,8 +3924,9 @@ function renderCards() {
       bidHistory_(d) +
       '<div class="card-products">' +
         '<div class="prod-lbl">รายการสินค้า</div>' +
-        '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>Shipment</th><th>Idea Price</th><th>%Margin (Idea)</th><th>ราคาเสนอ</th>' + (showMgOffer ? '<th>%Margin (Offer)</th>' : '') + (showApCol ? '<th>ราคาที่อนุมัติ</th>' : '') + '</tr></thead>' +
-        '<tbody>' + (pRows || '<tr><td colspan="' + (6 + (showMgOffer ? 1 : 0) + (showApCol ? 1 : 0)) + '" style="text-align:center;color:#aaa;padding:14px">ไม่มีข้อมูลสินค้า</td></tr>') + '</tbody></table>' +
+        '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>' + (showPeriod ? 'Shipment Request' : 'Shipment') + '</th><th>Idea Price</th><th>%Margin (Idea)</th><th>ราคาเสนอ</th>' + (showMgOffer ? '<th>%Margin (Offer)</th>' : '') + (showApCol ? '<th>ราคาที่อนุมัติ</th>' : '') +
+          (showPeriod ? '<th>Shipment ที่เสนอ</th>' : '') + (showDate ? '<th>Date ที่จะเสนอ</th>' : '') + (showValid ? '<th>Valid</th>' : '') + '</tr></thead>' +
+        '<tbody>' + (pRows || '<tr><td colspan="' + (6 + extraCols) + '" style="text-align:center;color:#aaa;padding:14px">ไม่มีข้อมูลสินค้า</td></tr>') + '</tbody></table>' +
       '</div>' +
       hist +
       (d.remark ? '<div class="remark-row"><b>หมายเหตุ:</b> ' + d.remark + '</div>' : '') +
