@@ -1496,8 +1496,6 @@ var currentTab = 1;
 var completedTabs = {};
 var savedSessions = []; // เก็บข้อมูลแต่ละรอบของสินค้า
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAfBG-BNJfw7y7MnbC6t4zC4Vckewu-VGQBBgSnEhAXqHEYRyFxjmKuvoLZxpM-Lw/exec';
-/* Google ตอบ 400 เมื่อ URL ยาวเกิน — วัดจริงแล้วอยู่ระหว่าง 12,000-14,000 เผื่อไว้ที่ 12,000 */
-var URL_LIMIT = 12000;
 
 /* ค่าเริ่มต้นจากหน้าตั้งค่า — ประกาศไว้ต้นไฟล์เพราะ addProduct() ถูกเรียกตอนโหลด */
 function getSettings() {
@@ -2090,22 +2088,15 @@ function submitWithRef_(refNum) {
   completedTabs[3] = true;
 
   if (APPS_SCRIPT_URL) {
-    // encode ซ้ำ 2 ชั้น: Apps Script ฝั่ง server ทำ decodeURIComponent ซ้ำอีกรอบ
-    // ถ้า encode ชั้นเดียว ค่าที่มี % (เช่น "48.6%") จะทำให้ server พังทั้งแถว (URIError)
-    // ใช้ fetch เพื่ออ่านผลจริงจาก server — แสดง success เฉพาะเมื่อบันทึกสำเร็จเท่านั้น
-    // Google ปัด URL ที่ยาวเกิน ~13,000 ตัวอักษรด้วย 400 และหน้า error ไม่มี CORS
-    // เบราว์เซอร์จึงรายงานแค่ "Failed to fetch" ซึ่งไม่บอกอะไรเลย — ดักไว้เองก่อน
-    var url = APPS_SCRIPT_URL + '?data=' + encodeURIComponent(encodeURIComponent(JSON.stringify(payload)));
-    if (url.length > URL_LIMIT) {
-      btn.textContent = 'ส่งคำขอใบเสนอราคา'; btn.disabled = false;
-      alert('ข้อมูลยาวเกินกว่าที่ระบบจะส่งได้ในครั้งเดียว\n\n' +
-            'ตอนนี้ยาว ' + url.length.toLocaleString() + ' จากที่รับได้ ' + URL_LIMIT.toLocaleString() + '\n\n' +
-            'วิธีแก้: ย่อข้อความในช่อง "จัดสรรเนื้อ" และ "หมายเหตุ" ให้สั้นลง\n' +
-            'หรือแยกส่งเป็นหลายใบ (ใบละ 1-2 สินค้า)\n\n' +
-            'ข้อความภาษาไทย 1 ตัวอักษรกินพื้นที่ราว 10 ตัว ข้อความยาว ๆ จึงเต็มเร็วกว่าที่คิด');
-      return;
-    }
-    fetch(url)
+    // ส่งแบบ POST — เดิมส่งผ่าน URL (?data=) ซึ่ง Google ปัดทิ้งเมื่อยาวเกิน ~12,000 ตัวอักษร
+    // (ข้อความไทยพองราว 10 เท่าตอน encode) POST รับได้หลายสิบ MB และ doPost ของ Script 1 มีอยู่แล้ว
+    // body เป็น JSON ตรง ๆ ไม่ต้อง encode 2 ชั้น — doPost ลอง JSON.parse ก่อนเสมอ
+    // Content-Type ต้องเป็น text/plain ไม่งั้นเบราว์เซอร์ยิง preflight ซึ่ง Apps Script ไม่ตอบ
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    })
       .then(function(res) { return res.json(); })
       .then(function(j) {
         if (j.status !== 'ok') throw new Error(j.msg || 'server error');
@@ -2897,6 +2888,17 @@ function apPricesOf_(ref, slot, n) {
   for (var i = 0; i < n; i++) out.push(arr[i] || '');
   return out;
 }
+/* จำนวนช่องราคาที่ผู้อนุมัติต้องกรอก — ทุกแถวเป็นสินค้าตัวเดียวกัน (ชื่อ + Code ตรงกัน) = ช่องเดียว
+   ใบแบบนี้คือสินค้าเดียวที่แยกแถวตามรอบ shipment และมักถูก bidding ต่อกันเป็นทอด ๆ
+   (8234 → 6220 → 2403) ผู้อนุมัติเคยต้องพิมพ์ราคาเดียวกันซ้ำทุกช่อง และใบ bidding ที่ทีมขายแก้ราคา
+   แค่แถวแรก ก็มีช่องของแถวที่ยังเป็นราคาเก่าโผล่มาให้กรอกด้วย ช่องเดียวจึงใช้กับทั้งใบ ยึดราคาเสนอของแถวแรก */
+function apInputCount_(d) {
+  var ps = (d && d.products) || [];
+  if (ps.length < 2) return 1;
+  var key = function(p){ return (String(p.type || '').trim() + '|' + String(p.spec || '').trim()).toUpperCase(); };
+  for (var i = 1; i < ps.length; i++) if (key(ps[i]) !== key(ps[0])) return ps.length;
+  return 1;
+}
 /* ค่ารายสินค้าต่างกันหรือเปล่า — ใช้ตัดสินว่าแถวสรุปด้านบนยกค่าเดียวมาอ้างเป็นของทั้งใบได้ไหม */
 function prodVaries_(d, key) {
   var list = ((d && d.products) || []).map(function(p){ return String(p[key] || '').trim(); })
@@ -3477,7 +3479,7 @@ function vote(ref, slot, dec) {
 /* อ่านราคาที่พิมพ์ไว้ในช่องของผู้อนุมัติ คืนเป็นสตริงเดียวพร้อมเก็บ (มี ;; ถ้าหลายสินค้า) */
 function readApPriceInput_(ref, slot) {
   var d = DATA.filter(function(x){ return x.ref === ref; })[0] || {};
-  var n = (d.products || []).length || 1;
+  var n = apInputCount_(d);
   var clean = function(v){ return String(v || '').trim().replace(/[|\]]/g, ' '); };
   if (n <= 1) {
     var one = document.getElementById('ap-' + slot + '-' + ref);
@@ -3694,7 +3696,12 @@ function renderCards() {
         var apVal = (approvals[d.ref] || {})[apKey] || '';
         var apId  = 'ap-' + slot + '-' + d.ref;
         var prods = d.products || [];
-        var nProd = prods.length || 1;
+        var nProd = apInputCount_(d);
+        // ใบเก่าที่เคยเคาะแยกไว้ เช่น "3650 ;; 3650" — ถ้าทุกช่องเท่ากันก็โชว์ค่าเดียวในช่องเดียว
+        if (nProd === 1 && apIsPerProduct_(apVal)) {
+          var uniq = apSplit_(apVal).filter(function(x, i, a){ return x && a.indexOf(x) === i; });
+          if (uniq.length === 1) apVal = uniq[0];
+        }
         var enterJs = 'if(event.key===\'Enter\'){event.preventDefault();saveApprovedPrice(\'' + d.ref + '\',\'' + slot + '\')}';
         // ใบหลายสินค้า: ช่องละสินค้า เรียงตามตารางข้างบน — เว้นว่างช่องไหน = อนุมัติตามราคาที่เสนอของชิ้นนั้น
         var priceInputs;
@@ -3719,7 +3726,8 @@ function renderCards() {
           '<div class="slot-label">' + label + '</div>' +
           voteArea +
           '<div class="close-field ap-price-field"><label>ราคาที่อนุมัติ (USD/MT)' +
-            (nProd > 1 ? ' <span class="ap-price-hint">— แยกตามสินค้า</span>' : '') + '</label>' +
+            (nProd > 1 ? ' <span class="ap-price-hint">— แยกตามสินค้า</span>'
+              : prods.length > 1 ? ' <span class="ap-price-hint">— ใช้กับทุกแถว (สินค้าเดียวกัน)</span>' : '') + '</label>' +
             priceInputs +
             // โหวตไปแล้วก็ยังแก้ราคาได้ ไม่ต้องยกเลิกโหวตก่อน
             (dec ? '<button class="btn-undo ap-save" onclick="saveApprovedPrice(\'' + d.ref + '\',\'' + slot + '\')">บันทึกราคา</button>' : '') +
