@@ -1994,14 +1994,44 @@ function buildMeta_(p) {
   return parts.length ? '[' + parts.join(' | ') + '] ' : '';
 }
 
-function submitForm() {
-  var g = function(id) { return document.getElementById(id) ? document.getElementById(id).value.trim() : ''; };
+/* REF สุ่ม 4 หลักชนกันได้จริง — SFD-2026-1612 ของ MITSUI (EMMA, 23 ก.ย.) ไปซ้ำกับใบ UMIOS (MAI, 21 ก.ย.)
+   Script 2 จัดกลุ่มตาม REF สินค้าของใบใหม่จึงไปต่อท้ายใบเก่าที่อนุมัติไปแล้ว
+   ก่อนส่งจึงดึงรายการ REF ที่มีอยู่มาเช็คก่อน ถ้าดึงไม่ได้ (เน็ตช้า/ล่ม) ยังส่งได้ โดยเช็คกับข้อมูลที่โหลดไว้ในเครื่อง */
+function newRef_() {
+  return 'SFD-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*9000)+1000);
+}
+function pickUniqueRef_() {
+  var taken = {};
+  (typeof DATA !== 'undefined' && DATA || []).forEach(function(d){ taken[d.ref] = 1; });
+  var pick = function() {
+    for (var i = 0; i < 200; i++) { var r = newRef_(); if (!taken[r]) return r; }
+    return newRef_();
+  };
+  var timeout = new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, 8000); });
+  return Promise.race([fetch(API_URL).then(function(res){ return res.json(); }), timeout])
+    .then(function(j) {
+      ((j && j.data) || []).forEach(function(row) {
+        ['REF', 'Timestamp'].forEach(function(k) {
+          var v = String(row[k] || '');
+          if (v.indexOf('SFD-') === 0) taken[v] = 1;
+        });
+      });
+      return pick();
+    })
+    .catch(function() { return pick(); });
+}
 
+function submitForm() {
   var miss = firstMissingField_();
   if (miss) { warnMissing_(miss); return; }
-  var prods = getProdData();
+  var btn = document.querySelector('.btn-submit-final');
+  btn.textContent = 'กำลังส่ง...'; btn.disabled = true;
+  pickUniqueRef_().then(submitWithRef_);
+}
 
-  var refNum = 'SFD-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*9000)+1000);
+function submitWithRef_(refNum) {
+  var g = function(id) { return document.getElementById(id) ? document.getElementById(id).value.trim() : ''; };
+  var prods = getProdData();
 
   var lastSession = {
     sessionNum: savedSessions.length + 1,
