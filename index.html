@@ -2346,7 +2346,20 @@ function parseSheetRows(rows) {
           // ว่าง = prodVaries_ ไม่นับ แถวสรุปจึงแสดงค่าระดับใบแบบเดิม
           period:      fmtShipment_(p['Shipment ที่จะเสนอ'] || ''),
           offerDate:   pm.date,
-          valid:       pm.valid
+          valid:       pm.valid,
+          freight:     pm.freight,
+          mtPerCont:   pm.mtPerCont,
+          fx:          pm.fx,
+          // ช่องรายละเอียดของแต่ละแถว — มีเมื่อ Script 2 (Version 18 ขึ้นไป) ส่งมา
+          qtyMonth:    cleanCell_(p['Quantity per Month (MT)'] || ''),
+          alloc:       cleanCell_(p['จัดสรรเนื้อ'] || ''),
+          lastClosed:  cleanCell_(p['ราคาปิดการขายล่าสุด'] || ''),
+          lastOffer:   cleanCell_(p['ราคาเสนอล่าสุด'] || ''),
+          currency:    cleanCell_(p['ค่าเงิน'] || ''),
+          other:       cleanCell_(p['อื่นๆ'] || ''),
+          // ตอนแก้ไข/bidding ช่องที่แถวนี้มีของตัวเอง ห้ามยืมค่าของแถวแรกมาเติม ช่องว่างก็คือว่างจริง
+          _ownMeta:    p['หมายเหตุ'] !== undefined,               // Script 2 v17+: ราคา/Margin/Shipment/DATE/VALID/เฟรท
+          _ownRow:     p['Quantity per Month (MT)'] !== undefined // Script 2 v18+: Qty/Month + ช่องรายละเอียด
         };
       });
     } else {
@@ -2915,6 +2928,11 @@ function prodVaries_(d, key) {
   return false;
 }
 /* ช่องบนแถวสรุปที่ค่าจริงต่างกันรายสินค้า — ชี้ไปดูในตารางแทนที่จะโชว์ของชิ้นแรก */
+/* Qty/Month ต่างกันรายสินค้าไหม — ใช้ Qty/Month ของแต่ละแถวถ้า Script 2 ส่งมา ไม่งั้นดู Quantity Request แทนแบบเดิม */
+function qtyMonthSplit_(d) {
+  var has = ((d && d.products) || []).some(function(p){ return !!p.qtyMonth; });
+  return has ? prodVaries_(d, 'qtyMonth') : prodVaries_(d, 'qty');
+}
 function detailSplitCell_(label) {
   return '<div class="detail-cell"><div class="dl">' + label + '</div>' +
     '<div class="dv">แยกตามสินค้า<div class="dv-sub">ดูในตารางด้านล่าง</div></div></div>';
@@ -3239,20 +3257,25 @@ function reviseOffer(ref, mode) {
   setOfferKind(d.offerKind === 'idea' ? 'idea' : 'offer');
   var prods = (d.products && d.products.length) ? d.products : [{}];
   prods.forEach(function(p, idx) {
+    // Script 2 ส่งค่าของแต่ละแถวมาครบ → ใช้ของแถวนั้นตรง ๆ ช่องว่างก็คือว่างจริง
+    // (เดิมเติมค่าของแถวแรกให้ทุกแถว — SFD-2026-9473 แถวที่ 2 ได้ %Margin -1.78, Qty/Month 409.5 MT,
+    //  ปริมาณต่อตู้ 24 ของแถวแรกไป และราคาปิด/ราคาเสนอล่าสุด/อื่นๆ ของตัวเองหายหมด)
+    // ใบที่อ่านจาก Script 2 เวอร์ชันเก่ายังไม่มีค่ารายแถว จึงถอยไปใช้ค่าระดับใบแบบเดิม
+    var own = !!p._ownRow, ownMeta = !!p._ownMeta;
+    var pick = function(k, mine) { return mine ? (p[k] || '') : (p[k] || d[k] || ''); };
     addProduct({
       type: p.type || '', code: p.spec || '', qty: p.qty || '', months: p.months || '',
       idea: (p.ideaPrice || '').replace(/^\$/, ''), margin: p.marginIdea || '',
-      // ข้อมูลระดับใบ ใส่เฉพาะรายการแรก กันซ้ำ
-      allocation: idx === 0 ? (d.alloc || '') : '',
-      lastClosed: idx === 0 ? (d.lastClosed || '') : '',
-      lastOffer:  idx === 0 ? (d.lastOffer || '') : '',
-      currency:   idx === 0 ? (d.currency || '') : '',
-      other:      idx === 0 ? (d.other || '') : '',
-      // ค่าที่มีรายสินค้าใช้ของชิ้นนั้นก่อน ไม่มีจึงถอยไปใช้ค่าระดับใบ (ใบเก่า / Apps Script ยังไม่ส่งมา)
-      period: p.period || d.period || '', offerPrice: p.offerPrice || d.offerPrice || '',
-      offerMargin: p.offerMargin || d.offerMargin || '', qtyMonth: d.qtyMonth || '',
-      offerDate: p.offerDate || d.offerDate || '', valid: p.valid || d.valid || '',
-      freight: d.freight || '', mtPerCont: d.mtPerCont || '', fx: d.fx || ''
+      // ข้อมูลรายละเอียด — ใบเก่าใส่เฉพาะรายการแรก กันซ้ำ
+      allocation: own ? (p.alloc || '')      : (idx === 0 ? (d.alloc || '') : ''),
+      lastClosed: own ? (p.lastClosed || '') : (idx === 0 ? (d.lastClosed || '') : ''),
+      lastOffer:  own ? (p.lastOffer || '')  : (idx === 0 ? (d.lastOffer || '') : ''),
+      currency:   own ? (p.currency || '')   : (idx === 0 ? (d.currency || '') : ''),
+      other:      own ? (p.other || '')      : (idx === 0 ? (d.other || '') : ''),
+      period: pick('period', ownMeta), offerPrice: pick('offerPrice', ownMeta),
+      offerMargin: pick('offerMargin', ownMeta), qtyMonth: pick('qtyMonth', own),
+      offerDate: pick('offerDate', ownMeta), valid: pick('valid', ownMeta),
+      freight: pick('freight', ownMeta), mtPerCont: pick('mtPerCont', ownMeta), fx: pick('fx', ownMeta)
     });
   });
 
@@ -3606,9 +3629,10 @@ function renderCards() {
     // Shipment ที่เสนอ / Date / Valid รายสินค้า — ขึ้นเฉพาะตอนที่แถวสรุปบอกว่า "แยกตามสินค้า"
     // ถ้าทุกชิ้นเท่ากัน แถวสรุปแสดงค่าเดียวอยู่แล้ว ไม่ต้องซ้ำในตาราง
     var showPeriod = prodVaries_(d, 'period');
+    var showQtyM   = prodVaries_(d, 'qtyMonth');
     var showDate   = d.offerKind !== 'idea' && prodVaries_(d, 'offerDate');
     var showValid  = d.offerKind !== 'idea' && prodVaries_(d, 'valid');
-    var extraCols  = (showMgOffer ? 1 : 0) + (showApCol ? 1 : 0) + (showPeriod ? 1 : 0) + (showDate ? 1 : 0) + (showValid ? 1 : 0);
+    var extraCols  = (showQtyM ? 1 : 0) + (showMgOffer ? 1 : 0) + (showApCol ? 1 : 0) + (showPeriod ? 1 : 0) + (showDate ? 1 : 0) + (showValid ? 1 : 0);
     var pRows = '';
     (d.products || []).forEach(function(p, pi) {
       // แสดงเฉพาะค่าของสินค้าชิ้นนั้นจริง ๆ — เดิมยืม %Margin ระดับใบมาใส่ทุกแถว
@@ -3629,6 +3653,7 @@ function renderCards() {
             (ap ? fmtPrice_(ap) : (p.offerPrice ? 'ตามที่เสนอ' : '—')) + '</span></td>';
         })() : '') +
         (showPeriod ? '<td style="color:#555">' + (p.period || '—') + '</td>' : '') +
+        (showQtyM   ? '<td style="color:#555">' + (p.qtyMonth || '—') + '</td>' : '') +
         (showDate   ? '<td style="color:#555">' + (p.offerDate || '—') + '</td>' : '') +
         (showValid  ? '<td style="color:#555">' + (p.valid || '—') + '</td>' : '') +
         '</tr>';
@@ -3664,7 +3689,7 @@ function renderCards() {
         (prodVaries_(d, 'offerMargin')
           ? detailSplitCell_('%Margin')
           : (d.offerMargin ? '<div class="detail-cell"><div class="dl">%Margin</div><div class="dv ' + (mgClass(d.offerMargin) === 'mg-h' ? 'dv-green' : mgClass(d.offerMargin) === 'mg-l' ? 'dv-red' : '') + '">' + fmtMargin_(d.offerMargin) + '</div></div>' : '')) +
-        (prodVaries_(d, 'qty')
+        (qtyMonthSplit_(d)
           ? detailSplitCell_('Qty/Month')
           : (d.qtyMonth ? '<div class="detail-cell"><div class="dl">Qty/Month</div><div class="dv">' + d.qtyMonth + '</div></div>' : '')) +
         (d.offerKind === 'idea' ? '' : prodVaries_(d, 'offerDate')
@@ -3970,7 +3995,7 @@ function renderCards() {
       '<div class="card-products">' +
         '<div class="prod-lbl">รายการสินค้า</div>' +
         '<table class="prod-table"><thead><tr><th>สินค้า / Product</th><th>Qty Request</th><th>' + (showPeriod ? 'Shipment Request' : 'Shipment') + '</th><th>Idea Price</th><th>%Margin (Idea)</th><th>ราคาเสนอ</th>' + (showMgOffer ? '<th>%Margin (Offer)</th>' : '') + (showApCol ? '<th>ราคาที่อนุมัติ</th>' : '') +
-          (showPeriod ? '<th>Shipment ที่เสนอ</th>' : '') + (showDate ? '<th>Date ที่จะเสนอ</th>' : '') + (showValid ? '<th>Valid</th>' : '') + '</tr></thead>' +
+          (showPeriod ? '<th>Shipment ที่เสนอ</th>' : '') + (showQtyM ? '<th>Qty/Month</th>' : '') + (showDate ? '<th>Date ที่จะเสนอ</th>' : '') + (showValid ? '<th>Valid</th>' : '') + '</tr></thead>' +
         '<tbody>' + (pRows || '<tr><td colspan="' + (6 + extraCols) + '" style="text-align:center;color:#aaa;padding:14px">ไม่มีข้อมูลสินค้า</td></tr>') + '</tbody></table>' +
       '</div>' +
       hist +
