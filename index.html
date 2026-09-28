@@ -1143,6 +1143,12 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
   .role-grid{grid-template-columns:repeat(2,1fr);gap:12px}
   .role-card{padding:34px 22px 26px}
 }
+/* แถบแจ้งว่ามีเวอร์ชันใหม่ — ดู checkNewVersion_() ท้ายไฟล์ */
+#new-version-bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:10000;display:none;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 32px);padding:12px 16px;background:#1A1714;color:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.25);font-family:"Sarabun",sans-serif;font-size:14px;line-height:1.5}
+#new-version-bar.show{display:flex}
+#new-version-bar button{border:0;border-radius:8px;padding:7px 14px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+#new-version-bar .nv-go{background:#A63D5F;color:#fff}
+#new-version-bar .nv-later{background:transparent;color:#ddd;border:1px solid #666}
 </style>
 </head>
 <body>
@@ -4348,6 +4354,41 @@ function switchRole() {
   }
 })();
 
+</script>
+<div id="new-version-bar" role="status">
+  <span>มีเวอร์ชันใหม่ของระบบ — ถ้ากำลังกรอกฟอร์ม ให้ copy ข้อความยาว ๆ เก็บไว้ก่อน แล้วค่อยกดรีเฟรช</span>
+  <button class="nv-go" onclick="location.reload()">รีเฟรช</button>
+  <button class="nv-later" onclick="document.getElementById('new-version-bar').classList.remove('show')">ไว้ทีหลัง</button>
+</div>
+<script>
+/* เว็บนี้โหลดโค้ดครั้งเดียวตอนเปิดหน้า แท็บที่เปิดค้างไว้ข้าม deploy จึงรันโค้ดเก่าต่อไปเรื่อย ๆ
+   (25 ก.ย. 2026 มีคนเจอคำเตือน "ข้อมูลยาวเกิน 12,000" ทั้งที่เอาเพดานออกไปแล้วตั้งแต่วันก่อน)
+   ทุก 5 นาทีและทุกครั้งที่กลับมาที่แท็บ จะดึงไฟล์ล่าสุดมาเช็คว่ายังมีโค้ดของหน้านี้อยู่ครบไหม (script 2 ตัวแรก)
+   ถ้าไม่มี = deploy เวอร์ชันใหม่แล้ว ขึ้นแถบให้กดรีเฟรชเอง ไม่รีเฟรชอัตโนมัติเพราะฟอร์มที่กรอกไว้จะหาย */
+(function() {
+  if (!/^https?:$/.test(location.protocol)) return;
+  // โค้ดหลักอยู่ใน <script> 2 ตัวแรก (ฟอร์ม / อนุมัติ+สถานะ) — ตัวนี้เองไม่นับ
+  var mine = [0, 1].map(function(i){ return (document.scripts[i] && document.scripts[i].textContent) || ''; })
+                   .filter(function(t){ return t.length > 1000; });
+  if (!mine.length) return;
+  var shown = false, busy = false;
+  function checkNewVersion_() {
+    if (shown || busy || document.hidden) return;
+    busy = true;
+    fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' })
+      .then(function(res) { return res.ok ? res.text() : ''; })
+      .then(function(html) {
+        if (html && html.length > 1000 && mine.some(function(t){ return html.indexOf(t) === -1; })) {
+          shown = true;
+          document.getElementById('new-version-bar').classList.add('show');
+        }
+      })
+      .catch(function() {})
+      .then(function() { busy = false; });
+  }
+  setInterval(checkNewVersion_, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', function() { if (!document.hidden) checkNewVersion_(); });
+})();
 </script>
 </body>
 </html>
