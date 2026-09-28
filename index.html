@@ -1618,7 +1618,8 @@ function goNext(from) {
     }
   }
   if (from === 2) {
-    if (document.querySelectorAll('.prod-block').length === 0) {
+    // กด "+เพิ่มสินค้า" แล้วเปลี่ยนใจ ลบการ์ดเปล่าทิ้ง — สินค้าในชุดที่บันทึกไว้แล้วยังนับ ไปต่อได้
+    if (document.querySelectorAll('.prod-block').length === 0 && savedSessions.length === 0) {
       alert('กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการค่ะ');
       return;
     }
