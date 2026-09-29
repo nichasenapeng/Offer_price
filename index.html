@@ -954,6 +954,21 @@ body::before, body::after { display: none !important; }
   #offer-app .g2, #offer-app .g3 { grid-template-columns: 1fr; }
   .site-header { padding: 0 14px; }
 }
+/* ── Draft: ใบที่กรอกค้างไว้ (เก็บในเครื่อง) ── */
+.draft-panel{background:rgba(255,255,255,0.92);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:16px}
+.draft-panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.draft-panel-title{font-family:"Kanit",sans-serif;font-weight:600;font-size:15px;color:var(--ink)}
+.draft-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px;background:#fff}
+.draft-row-main{min-width:0}
+.draft-row-name{font-weight:600;font-size:14px;color:var(--ink);overflow-wrap:anywhere}
+.draft-row-meta{font-size:12px;color:var(--ink-muted);margin-top:2px}
+.draft-tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:6px;background:rgba(37,99,235,.1);color:#1d4ed8;margin-left:6px}
+.draft-row-btns{display:flex;gap:6px;flex-shrink:0}
+.draft-btn{border:1.5px solid var(--border);background:#fff;border-radius:8px;padding:6px 12px;font-family:"Sarabun",sans-serif;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer}
+.draft-btn:hover{border-color:var(--red);color:var(--red)}
+.draft-btn.primary{background:var(--red);border-color:var(--red);color:#fff}
+.draft-status{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--ink-muted);margin-bottom:12px}
+.draft-status .ds-ok{color:var(--green);font-weight:600}
 .revise-banner{background:rgba(255,255,255,0.9);border:1.5px solid var(--red);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:16px;font-size:14px;color:var(--ink);box-shadow:0 4px 16px rgba(166,61,95,.12)}
 .revise-reason{margin-top:7px;font-size:13px;color:var(--red-dark);background:rgba(246,235,239,0.8);border-radius:6px;padding:8px 12px;line-height:1.55}
 .revise-hint{margin-top:8px;font-size:12px;color:var(--ink-muted)}
@@ -1235,6 +1250,8 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
 
 <!-- TAB BAR -->
 <div class="wizard-wrap" role="main">
+  <div class="draft-panel" id="draft-panel" style="display:none"></div>
+  <div class="draft-status" id="draft-status" style="display:none"></div>
   <div class="revise-banner" id="revise-banner" style="display:none"></div>
   <div class="tab-bar">
     <div class="tab-item active" id="ti-1">
@@ -2120,6 +2137,7 @@ function submitWithRef_(refNum) {
 
 function showSuccess(refNum) {
   applySupersede_();   // ใบใหม่ลงชีทแล้ว ค่อยปิดใบเดิมเป็น bidding
+  draftDiscardCurrent_();   // ส่งสำเร็จ = draft ของใบนี้หมดหน้าที่
   document.getElementById('ref-number').textContent = 'REF: ' + refNum;
   document.getElementById('success-overlay').classList.add('show');
 }
@@ -2140,6 +2158,8 @@ function resetForm() {
   var btn = document.querySelector('.btn-submit-final');
   if (btn) { btn.textContent = 'ส่งคำขอใบเสนอราคา'; btn.disabled = false; }
   showTab(1);
+  window._draftId = null;
+  renderDraftPanel_();
 }
 
 /* ── LOGIN ── */
@@ -2194,8 +2214,11 @@ document.addEventListener('click', function(e) {
 
   if (userBtn) {
     selectUser(userBtn.dataset.user);
+    renderDraftPanel_();
     return;
   }
+
+  if (t.closest('#offer-app')) draftSaveSoon_();
 
   if (rmBtn) {
     removeProduct(Number(rmBtn.dataset.rmid));
@@ -2213,6 +2236,207 @@ document.addEventListener('click', function(e) {
     if (action === 'reset')      { resetForm(); return; }
   }
 });
+
+/* ── DRAFT: ใบที่กรอกค้างไว้ ──
+   เก็บใน localStorage ของเครื่องนั้น (ไม่ขึ้น server) แยกตามชื่อผู้ใช้ มีได้หลายใบ
+   บันทึกเองหลังพิมพ์/คลิกในฟอร์ม ~1.5 วินาที และทันทีตอนสลับแท็บหรือปิดหน้า
+   ส่งสำเร็จ = ลบ draft ของใบนั้น · ไม่ได้แตะเกิน 30 วันลบทิ้งเอง
+   ใบแก้ไข/bidding จำ REF เดิมไว้ด้วย — ใบเดิมยังไม่ถูกตีเป็น bidding จนกว่าจะส่ง draft นั้นสำเร็จ */
+var DRAFT_KEY = 'sf_drafts_v1';
+var DRAFT_TTL = 30 * 24 * 3600 * 1000;
+window._draftId = null;
+var draftTimer_ = null;
+
+function draftReadAll_() {
+  var all = {};
+  try { all = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') || {}; } catch (e) { all = {}; }
+  var now = Date.now(), changed = false;
+  Object.keys(all).forEach(function(id) {
+    if (!all[id] || now - (all[id].updatedAt || 0) > DRAFT_TTL) { delete all[id]; changed = true; }
+  });
+  if (changed) draftWriteAll_(all);
+  return all;
+}
+function draftWriteAll_(all) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(all)); return true; } catch (e) { return false; }
+}
+function draftsOf_(user) {
+  var all = draftReadAll_();
+  return Object.keys(all).map(function(id){ return all[id]; })
+    .filter(function(d){ return d.user === user; })
+    .sort(function(a, b){ return b.updatedAt - a.updatedAt; });
+}
+
+/* ฟอร์มยังว่างอยู่ไหม — ไม่สร้าง draft จากฟอร์มเปล่า (แค่เปิดหน้าแล้วออก) */
+function draftFormIsBlank_() {
+  var v = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  if (v('c-company') || v('c-port') || savedSessions.length) return false;
+  var cur = getProdData();
+  return !cur.some(function(p){ return p.type || p.code || p.idea || p.offerPrice || p.qty; });
+}
+
+function draftCollect_() {
+  var v = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
+  var banner = document.getElementById('revise-banner');
+  return {
+    customer: { company: v('c-company'), port: v('c-port'), incoterm: v('t-incoterm'),
+                payment: v('t-payment'), orderType: v('t-order-type') },
+    offerKind: offerKind,
+    savedSessions: JSON.parse(JSON.stringify(savedSessions)),
+    current: getProdData(),
+    remark: v('t-remark'),
+    tab: currentTab,
+    completedTabs: JSON.parse(JSON.stringify(completedTabs)),
+    reviseFrom: window._reviseFrom || null,
+    supersede: window._supersedeOnSubmit || null,
+    bannerHtml: banner && banner.style.display !== 'none' ? banner.innerHTML : ''
+  };
+}
+
+function draftSaveSoon_() {
+  clearTimeout(draftTimer_);
+  draftTimer_ = setTimeout(draftSaveNow_, 1500);
+}
+function draftSaveNow_() {
+  // ต้องคืนเป็น null ด้วย — switchRole()/pagehide เช็คตัวนี้ว่ายังมีงานค้างไหม ถ้าค้าง id เก่าไว้
+  // จะบันทึกซ้ำตอนออกจากหน้า หลัง switchRole ล้าง _supersedeOnSubmit ไปแล้ว draft bidding เลยลืม REF เดิม
+  clearTimeout(draftTimer_); draftTimer_ = null;
+  var user = window._currentUser;
+  var app = document.getElementById('offer-app');
+  if (!user || !app || app.style.display === 'none') return;
+  if (document.getElementById('success-overlay').classList.contains('show')) return;
+  if (!window._draftId && draftFormIsBlank_()) return;
+  var all = draftReadAll_();
+  if (!window._draftId) window._draftId = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  var d = draftCollect_();
+  d.id = window._draftId; d.user = user; d.updatedAt = Date.now();
+  d.createdAt = (all[d.id] && all[d.id].createdAt) || d.updatedAt;
+  all[d.id] = d;
+  var ok = draftWriteAll_(all);
+  renderDraftStatus_(ok ? d.updatedAt : 0);
+}
+
+function draftDiscardCurrent_() {
+  clearTimeout(draftTimer_); draftTimer_ = null;
+  if (!window._draftId) return;
+  var all = draftReadAll_();
+  delete all[window._draftId];
+  draftWriteAll_(all);
+  window._draftId = null;
+  renderDraftStatus_(null);
+}
+
+function draftWhen_(ts) {
+  var d = new Date(ts), now = new Date();
+  var hm = pad2_(d.getHours()) + ':' + pad2_(d.getMinutes());
+  var day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (ts >= day0) return 'วันนี้ ' + hm;
+  if (ts >= day0 - 86400000) return 'เมื่อวาน ' + hm;
+  return pad2_(d.getDate()) + '/' + pad2_(d.getMonth() + 1) + ' ' + hm;
+}
+function draftEsc_(t) {
+  return String(t || '').replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+}
+
+function renderDraftStatus_(ts) {
+  var el = document.getElementById('draft-status');
+  if (!el) return;
+  if (ts === null || !window._draftId) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML = (ts
+      ? '<span class="ds-ok">&#10003; บันทึก draft แล้ว ' + draftWhen_(ts).replace('วันนี้ ', '') + '</span>'
+      : '<span style="color:var(--red)">บันทึก draft ไม่ได้ — พื้นที่ในเบราว์เซอร์อาจเต็ม</span>') +
+    '<span style="display:flex;gap:6px">' +
+      '<button class="draft-btn" onclick="draftSaveAndLeave_()">บันทึกแล้วออก</button>' +
+      '<button class="draft-btn" onclick="draftDiscardFromForm_()">ทิ้ง draft นี้</button>' +
+    '</span>';
+  el.style.display = 'flex';
+}
+
+function renderDraftPanel_() {
+  var el = document.getElementById('draft-panel');
+  if (!el) return;
+  var list = window._currentUser ? draftsOf_(window._currentUser)
+    .filter(function(d){ return d.id !== window._draftId; }) : [];
+  if (!list.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML =
+    '<div class="draft-panel-head"><div class="draft-panel-title">ใบที่กรอกค้างไว้ของ ' + draftEsc_(window._currentUser) +
+      ' (' + list.length + ')</div>' +
+      '<span style="font-size:12px;color:var(--ink-muted)">เก็บไว้ในเครื่องนี้เท่านั้น</span></div>' +
+    list.map(function(d) {
+      var c = d.customer || {};
+      var n = (d.savedSessions || []).reduce(function(a, s){ return a + (s.products || []).length; }, 0) +
+              (d.current || []).filter(function(p){ return p.type; }).length;
+      var bid = d.supersede ? '<span class="draft-tag">bidding จาก ' + draftEsc_(d.supersede.ref) + '</span>'
+              : d.reviseFrom ? '<span class="draft-tag">แก้ไขจาก ' + draftEsc_(d.reviseFrom) + '</span>' : '';
+      return '<div class="draft-row"><div class="draft-row-main">' +
+          '<div class="draft-row-name">' + draftEsc_(c.company || '(ยังไม่ใส่ชื่อลูกค้า)') +
+            (c.port ? ' · ' + draftEsc_(c.port) : '') + bid + '</div>' +
+          '<div class="draft-row-meta">' + n + ' สินค้า · ค้างที่ Step ' + (d.tab || 1) +
+            ' · บันทึกล่าสุด ' + draftWhen_(d.updatedAt) + '</div>' +
+        '</div><div class="draft-row-btns">' +
+          '<button class="draft-btn primary" onclick="draftResume_(\'' + d.id + '\')">กรอกต่อ</button>' +
+          '<button class="draft-btn" onclick="draftDelete_(\'' + d.id + '\')" aria-label="ลบ draft นี้">ลบ</button>' +
+        '</div></div>';
+    }).join('');
+  el.style.display = 'block';
+}
+
+function draftResume_(id) {
+  var all = draftReadAll_();
+  var d = all[id];
+  if (!d) { renderDraftPanel_(); return; }
+  if (window._draftId) draftSaveNow_();          // ใบที่กำลังกรอกอยู่ก็เก็บไว้ก่อน ไม่ทับกัน
+  window._draftId = id;
+  var c = d.customer || {};
+  var set = function(elId, val){ var el = document.getElementById(elId); if (el) el.value = val || ''; };
+  set('c-company', c.company); set('c-port', c.port);
+  set('t-incoterm', c.incoterm); set('t-payment', c.payment); set('t-order-type', c.orderType);
+  document.getElementById('products-container').innerHTML = '';
+  prodCount = 0;
+  savedSessions = d.savedSessions || [];
+  updateSessionBar();
+  setOfferKind(d.offerKind);
+  (d.current || []).forEach(function(p){ addProduct(p); });
+  if (!(d.current || []).length && !savedSessions.length) addProduct();
+  set('t-remark', d.remark);
+  window._reviseFrom = d.reviseFrom || null;
+  window._supersedeOnSubmit = d.supersede || null;
+  var banner = document.getElementById('revise-banner');
+  if (banner) { banner.innerHTML = d.bannerHtml || ''; banner.style.display = d.bannerHtml ? 'block' : 'none'; }
+  completedTabs = d.completedTabs || {};
+  var btn = document.querySelector('.btn-submit-final');
+  if (btn) { btn.textContent = 'ส่งคำขอใบเสนอราคา'; btn.disabled = false; }
+  showTab(d.tab || 1);
+  if (d.tab === 3) renderSummary();
+  renderDraftPanel_();
+  renderDraftStatus_(d.updatedAt);
+}
+
+function draftDelete_(id) {
+  if (!confirm('ลบ draft นี้ทิ้ง? ลบแล้วกู้คืนไม่ได้')) return;
+  var all = draftReadAll_();
+  delete all[id];
+  draftWriteAll_(all);
+  renderDraftPanel_();
+}
+function draftDiscardFromForm_() {
+  if (!confirm('ทิ้ง draft นี้และล้างฟอร์ม? ลบแล้วกู้คืนไม่ได้')) return;
+  draftDiscardCurrent_();
+  resetForm();
+}
+function draftSaveAndLeave_() {
+  draftSaveNow_();
+  switchRole();
+}
+
+// พิมพ์ / เลือกค่าในฟอร์ม → บันทึก · สลับแท็บหรือปิดหน้า → บันทึกทันที
+['input', 'change'].forEach(function(ev) {
+  document.addEventListener(ev, function(e) {
+    if (e.target && e.target.closest && e.target.closest('#offer-app')) draftSaveSoon_();
+  });
+});
+document.addEventListener('visibilitychange', function() { if (document.hidden && draftTimer_) draftSaveNow_(); });
+window.addEventListener('pagehide', function() { if (draftTimer_) draftSaveNow_(); });
 
 </script>
 <script>
@@ -3238,6 +3462,7 @@ function reviseOffer(ref, mode) {
   if (av.remarkA2) reasons.push('Approve 2: ' + av.remarkA2);
 
   if (mode !== 'bidding') window._supersedeOnSubmit = null;
+  window._draftId = null;   // ใบแก้ไข/bidding เริ่ม draft ใหม่ของตัวเองเมื่อเริ่มแก้
   enterRole('offer');
   if (d.salesUser) selectUser(d.salesUser);
 
@@ -4365,6 +4590,8 @@ function enterRole(role) {
   }
 }
 function switchRole() {
+  // บันทึก draft ที่ค้างอยู่ก่อน — ต้องทำก่อนล้าง _supersedeOnSubmit ไม่งั้น draft ใบ bidding ลืมว่ามาจาก REF ไหน
+  if (draftTimer_) draftSaveNow_();
   window._supersedeOnSubmit = null;   // ทิ้งฟอร์มกลางคัน = ใบเดิมยังอยู่ในรอปิดการขาย
   // กลับหน้าหลัก: ตัด ?mode= ออก ไม่งั้นจะเด้งเข้าโหมดเดิมซ้ำ
   var u = new URL(location.href);
@@ -4382,7 +4609,7 @@ function switchRole() {
 
 </script>
 <div id="new-version-bar" role="status">
-  <span>มีเวอร์ชันใหม่ของระบบ — ถ้ากำลังกรอกฟอร์ม ให้ copy ข้อความยาว ๆ เก็บไว้ก่อน แล้วค่อยกดรีเฟรช</span>
+  <span>มีเวอร์ชันใหม่ของระบบ — ใบที่กรอกค้างไว้ถูกเก็บเป็น draft แล้ว รีเฟรชแล้วกด "กรอกต่อ" ได้เลย</span>
   <button class="nv-go" onclick="location.reload()">รีเฟรช</button>
   <button class="nv-later" onclick="document.getElementById('new-version-bar').classList.remove('show')">ไว้ทีหลัง</button>
 </div>
