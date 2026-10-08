@@ -760,6 +760,17 @@ body::before, body::after { display: none !important; }
 .btn-idea:hover{background:#8a5a08;color:#fff;transform:translateY(-1px);box-shadow:0 4px 14px rgba(138,90,8,.28)}
 .idea-note{margin-bottom:14px;padding:10px 14px;border-radius:10px;background:#FEF3C7;color:#8a5a08;border:1px solid #f0c76b;font-size:14px}
 .idea-note .idea-remark{margin-top:4px;color:#5c3d05;white-space:pre-wrap}
+.fb-box{margin:0 0 14px;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.85);border:1px solid var(--border)}
+.fb-title{font-family:"Kanit",sans-serif;font-weight:600;font-size:13px;color:var(--ink);margin-bottom:8px}
+.fb-item{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px dashed var(--border)}
+.fb-item:first-of-type{border-top:0}
+.fb-date{flex:0 0 auto;font-size:12px;font-weight:600;color:#8a5a08;background:#FEF3C7;border-radius:6px;padding:2px 8px;white-space:nowrap}
+.fb-text{flex:1 1 auto;font-size:14px;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.fb-del{flex:0 0 auto;border:0;background:transparent;color:var(--ink-muted);font-size:16px;line-height:1;cursor:pointer;padding:0 4px}
+.fb-del:hover{color:var(--red)}
+.fb-empty{font-size:13px;color:var(--ink-muted);padding:2px 0 6px}
+.fb-form{margin-top:10px;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.fb-form .fb-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 /* ลบ = ซ่อนจากหน้าจอ แถวยังอยู่ในชีท กู้คืนได้ตลอด */
 .btn-trash{background:transparent;color:var(--ink-muted);border:1.5px dashed #cbd5e1}
 .btn-trash:hover{background:var(--red);color:#fff;border-color:var(--red);border-style:solid}
@@ -2683,7 +2694,8 @@ function demoApprovals() {
     'SFD-2026-0106': { A1:'approved', A2:'approved', close:'closed-won', closeShipment:'Nov/Dec 2026', closeQty:'48 MT / 2 FCL', closePrice:'3,300', closeMargin:'41.2%', closeRemark:'ลูกค้าตกลงตามราคาเสนอ ขอเลื่อน shipment เป็นต้นเดือน', closeDate:'2026-09-05' },
     'SFD-2026-0107': { A1:'approved', A2:'approved', close:'closed-won', closeShipment:'Jan 2027', closeQty:'24 MT / 1 FCL', closePrice:'3,900', closeMargin:'47.5%', closeDate:'2026-09-06' },
     'SFD-2026-0108': { A1:'approved', A2:'approved', close:'closed-lost' },
-    'SFD-2026-0103': { A1:'approved', A2:'approved', close:'idea-given', closeRemark:'ให้ไอเดีย 3,250–3,300 ไปก่อน ลูกค้าขอเช็คงบภายในสัปดาห์หน้า', closeDate:'2026-09-15' },
+    'SFD-2026-0103': { A1:'approved', A2:'approved', close:'idea-given', closeRemark:'ให้ไอเดีย 3,250–3,300 ไปก่อน ลูกค้าขอเช็คงบภายในสัปดาห์หน้า', closeDate:'2026-09-15',
+      feedback:[{d:'2026-09-17', t:'ลูกค้าบอกราคานี้ยังสูงกว่าคู่แข่ง ขอ 3,150'}, {d:'2026-09-22', t:'รอ board อนุมัติงบ คาดได้คำตอบสัปดาห์หน้า'}] },
     'SFD-2026-0105': { A1:'approved', A2:'approved', close:'not-offered', closeRemark:'ลูกค้าเปลี่ยนแผน ยังไม่ได้ส่งราคาให้', closeDate:'2026-09-08' },
     'SFD-2026-0109': { A1:'rejected', remarkA1:'margin ต่ำกว่าเกณฑ์ ขอปรับราคาใหม่' },
     'SFD-2026-0110': { A1:'approved' }
@@ -2768,6 +2780,7 @@ function loadData() {
               CLOSE_FIELDS.forEach(function(f, i){ if (ov[i+1]) approvals[d.ref][f.key] = ov[i+1]; });
               if (ov[5]) approvals[d.ref].closeRemark = ov[5];
               if (ov[6]) approvals[d.ref].closeDate = ov[6];
+              if (ov[7]) approvals[d.ref].feedback = fbParse_(ov.slice(7).join('|'));
             } else if (ov[1]) {
               approvals[d.ref].closePrice = ov[1];  // ข้อมูลเก่าที่เก็บแค่ราคา
             }
@@ -3576,6 +3589,72 @@ var CLOSE_FIELDS = [
   { key: 'closeMargin',   id: 'close-margin',   label: '%Margin',               from: 'offerMargin' }
 ];
 
+/* ── Feedback ของลูกค้าหลังให้ไอเดียราคา ──
+   ทีมขายอัปเดตต่อลงมาเรื่อย ๆ ได้ (วันที่ + ข้อความ) เก็บเป็นช่องที่ 8 ของ สถานะรวม โดยไม่ต้องเพิ่มคอลัมน์
+   idea-given|||||remark|YYYY-MM-DD|2026-09-17~ข้อความ ;; 2026-09-20~ข้อความ
+   คั่นแต่ละรายการด้วย ;; และแยกวันที่กับข้อความด้วย ~ ตัวแรก (ข้อความมี ~ ได้) ล้าง | กับ ;; ออกจากข้อความ
+   ส่งต่อไปกับสถานะปิดการขายด้วย (closed-won / closed-lost / not-offered) ประวัติจะได้ไม่หายตอนปิดดีล */
+function fbParse_(raw) {
+  return String(raw || '').split(';;').map(function(e){ return e.trim(); }).filter(Boolean).map(function(e) {
+    var i = e.indexOf('~');
+    return i > 0 ? { d: e.slice(0, i), t: e.slice(i + 1).trim() } : { d: '', t: e };
+  });
+}
+function fbSerialize_(list) {
+  return (list || []).filter(function(e){ return e && String(e.t || '').trim(); }).map(function(e) {
+    var t = String(e.t).replace(/\|/g, ' ').replace(/;;/g, ';').trim();
+    return (e.d || '') + '~' + t;
+  }).join(' ;; ');
+}
+function ideaStatusVal_(av) {
+  var fb = fbSerialize_(av.feedback);
+  return 'idea-given|||||' + (av.closeRemark || '') + '|' + (av.closeDate || '') + (fb ? '|' + fb : '');
+}
+/* รายการ feedback — editable = มีช่องเพิ่ม/ลบ (ใบที่ยังรอติดตามอยู่) ไม่งั้นแสดงอย่างเดียว */
+function fbBlock_(d, editable) {
+  var av = approvals[d.ref] || {};
+  var list = av.feedback || [];
+  if (!editable && !list.length) return '';
+  var items = list.map(function(e, i) {
+    return '<div class="fb-item"><span class="fb-date">' + (e.d ? thaiDate(e.d) : '—') + '</span>' +
+      '<span class="fb-text">' + draftEsc_(e.t) + '</span>' +
+      (editable ? '<button class="fb-del" title="ลบรายการนี้" aria-label="ลบ feedback" onclick="deleteFeedback(\'' + d.ref + '\',' + i + ')">&times;</button>' : '') +
+    '</div>';
+  }).join('');
+  return '<div class="fb-box"><div class="fb-title">Feedback จากลูกค้า' + (list.length ? ' (' + list.length + ')' : '') + '</div>' +
+    (items || '<div class="fb-empty">ยังไม่มี feedback — พิมพ์ด้านล่างเมื่อลูกค้าตอบกลับ</div>') +
+    (editable
+      ? '<div class="fb-form">' +
+          '<textarea id="fb-text-' + d.ref + '" class="close-input close-remark" rows="2" placeholder="เช่น ลูกค้าบอกราคานี้ยังสูง ขอ 3,200 / ลูกค้ารอ board อนุมัติสัปดาห์หน้า"></textarea>' +
+          '<div class="fb-row">' + dateInput('fb-date-' + d.ref, todayISO()) +
+            '<button class="vote-btn btn-approve" style="flex:0 0 auto" onclick="addFeedback(\'' + d.ref + '\')">เพิ่ม feedback</button></div>' +
+        '</div>'
+      : '') +
+  '</div>';
+}
+function addFeedback(ref) {
+  var av = approvals[ref];
+  if (!av || av.close !== 'idea-given') { showToast('เพิ่ม feedback ได้เฉพาะใบที่ให้ไอเดียราคาไว้', 'red'); return; }
+  var tEl = document.getElementById('fb-text-' + ref);
+  var dEl = document.getElementById('fb-date-' + ref);
+  var text = tEl ? tEl.value.trim() : '';
+  if (!text) { showToast('พิมพ์ feedback ก่อน', 'red'); if (tEl) tEl.focus(); return; }
+  (av.feedback = av.feedback || []).push({ d: (dEl && dEl.value) || todayISO(), t: text });
+  av.feedback.sort(function(a, b){ return String(a.d).localeCompare(String(b.d)); });   // เรียงตามวันที่ ใส่ย้อนหลังก็ไม่ลำดับเพี้ยน
+  postSaleState(ref, ideaStatusVal_(av));
+  showToast('เพิ่ม feedback แล้ว', 'green');
+  renderCards();
+}
+function deleteFeedback(ref, i) {
+  var av = approvals[ref];
+  if (!av || !av.feedback || !av.feedback[i]) return;
+  if (!confirm('ลบ feedback รายการนี้?\n\n' + av.feedback[i].t)) return;
+  av.feedback.splice(i, 1);
+  postSaleState(ref, ideaStatusVal_(av));
+  showToast('ลบ feedback แล้ว');
+  renderCards();
+}
+
 function closeSale(ref, result) {
   if (!approvals[ref]) approvals[ref] = {};
   var remEl = document.getElementById('close-remark-' + ref);
@@ -3608,7 +3687,8 @@ function closeSale(ref, result) {
   approvals[ref].close = result;
   approvals[ref].closeRemark = remark;
   approvals[ref].closeDate = closeDate;
-  postSaleState(ref, vals ? result + '|' + vals.join('|') : result);
+  var fbStr = fbSerialize_(approvals[ref].feedback);
+  postSaleState(ref, vals ? result + '|' + vals.join('|') + (fbStr ? '|' + fbStr : '') : result);
   var doneMsg = { 'closed-won': 'บันทึกแล้ว: ปิดการขายได้ ' + approvals[ref].closePrice + ' USD/MT',
                   'closed-lost': 'บันทึกแล้ว: ไม่ปิดการขาย',
                   'not-offered': 'บันทึกแล้ว: ไม่เสนอราคานี้ให้ลูกค้า',
@@ -3644,6 +3724,7 @@ function undoClose(ref) {
     delete approvals[ref].close;
     delete approvals[ref].closeRemark;
     delete approvals[ref].closeDate;
+    delete approvals[ref].feedback;
     CLOSE_FIELDS.forEach(function(f){ delete approvals[ref][f.key]; });
   }
   postSaleState(ref, 'approved');
@@ -3768,7 +3849,7 @@ function saveApprovedPrice(ref, slot) {
   var statusVal = av.extState
     ? 'ext-' + av.extState + '|' + (av.extValid || '') + '|' + (av.extReason || '') + '|' + (av.extNote || '')
     : (st === 'idea-given')
-      ? 'idea-given|||||' + (av.closeRemark || '') + '|' + (av.closeDate || '')
+      ? ideaStatusVal_(av)
       : st;
   postSaleState(ref, statusVal);
   showToast(v ? 'บันทึกราคาที่อนุมัติ ' + v + ' แล้ว' : 'ล้างราคาที่อนุมัติแล้ว', 'green');
@@ -4118,7 +4199,8 @@ function renderCards() {
         closeInner = (isIdea
             ? '<div class="idea-note"><b>ให้ไอเดียราคาแล้ว' + (av.closeDate ? ' เมื่อ ' + thaiDate(av.closeDate) : '') + '</b> — รอติดตามผลกับลูกค้า' +
               (av.closeRemark ? '<div class="idea-remark">' + av.closeRemark + '</div>' : '') +
-              '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">ยกเลิก</button></div>'
+              '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">ยกเลิก</button></div>' +
+              fbBlock_(d, true)
             : '') +
           '<div class="close-field close-date-wrap"><label>' + (isIdea ? 'วันที่ (ปิดการขาย / อัปเดตไอเดีย)' : 'วันที่ปิดการขาย') + '</label>' +
           dateInput('close-date-' + d.ref, isIdea ? todayISO() : (av.closeDate || todayISO())) + '</div>' +
@@ -4139,7 +4221,8 @@ function renderCards() {
           }).join('');
         closeInner = '<div class="close-summary">' + cells +
           '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">แก้ไข</button></div>' +
-          (av.closeRemark ? '<div class="close-remark-note"><b>Remark:</b> ' + av.closeRemark + '</div>' : '');
+          (av.closeRemark ? '<div class="close-remark-note"><b>Remark:</b> ' + av.closeRemark + '</div>' : '') +
+          fbBlock_(d, false);
       } else if (status === 'not-offered') {
         closeInner = '<div class="vote-result notoffer">ไม่เสนอราคานี้ให้ลูกค้า' +
           '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">แก้ไข</button></div>' +
@@ -4147,7 +4230,8 @@ function renderCards() {
       } else {
         closeInner = '<div class="vote-result rejected">ไม่ปิดการขาย' +
           '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">แก้ไข</button></div>' +
-          (av.closeRemark ? '<div class="close-remark-note"><b>Remark:</b> ' + av.closeRemark + '</div>' : '');
+          (av.closeRemark ? '<div class="close-remark-note"><b>Remark:</b> ' + av.closeRemark + '</div>' : '') +
+          fbBlock_(d, false);
       }
       var negotiate = '';
       if (status === 'approved') {
