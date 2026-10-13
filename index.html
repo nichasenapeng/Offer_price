@@ -1145,6 +1145,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
 .role-sub{font-size:11px;color:var(--ink-muted);letter-spacing:.14em;text-transform:uppercase;margin:6px 0 30px}
 
 .role-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;justify-items:center}
+.role-grid.team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.team-tile .tile-t{font-size:15px;text-align:center}
+.team-tile.not-ready{opacity:.55}
+.team-chip-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 22px;flex-wrap:wrap}
+.team-chip{font-family:"Kanit",sans-serif;font-weight:600;font-size:14px;color:var(--ink);background:rgba(166,61,95,.1);border:1px solid rgba(166,61,95,.3);border-radius:999px;padding:5px 16px}
+.team-change{border:0;background:transparent;color:var(--ink-muted);font-family:"Sarabun",sans-serif;font-size:13px;text-decoration:underline;cursor:pointer}
+.team-change:hover{color:var(--red)}
 .role-tile{
   aspect-ratio:1/1;width:100%;max-width:172px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
@@ -1180,10 +1187,32 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
 <body>
 
 <!-- ROLE SELECT -->
-<div class="role-overlay" id="role-overlay">
+<div class="role-overlay" id="team-overlay">
   <div class="role-card">
     <div class="role-logo">SUN<span>FOOD</span></div>
-    <div class="role-sub">Offer &amp; Approval System</div>
+    <div class="role-sub">Offer &amp; Approval System · เลือกฝ่าย</div>
+    <div class="role-grid team-grid">
+      <button class="role-tile team-tile" onclick="pickTeam('export')">
+        <span class="tile-ic tile-ic-offer"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/></svg></span>
+        <span class="tile-t">Export Sales Team</span>
+        <span class="tile-d">ทีมขายต่างประเทศ</span>
+      </button>
+      <button class="role-tile team-tile" onclick="pickTeam('fsc')">
+        <span class="tile-ic tile-ic-status"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg></span>
+        <span class="tile-t">Food Supply Chain</span>
+        <span class="tile-d">ฝ่ายซัพพลายเชน</span>
+      </button>
+    </div>
+    <div class="role-footer">SUNFOOD INTERNATIONAL</div>
+  </div>
+</div>
+
+<div class="role-overlay" id="role-overlay" style="display:none">
+  <div class="role-card">
+    <div class="role-logo">SUN<span>FOOD</span></div>
+    <div class="role-sub" style="margin-bottom:14px">Offer &amp; Approval System</div>
+    <div class="team-chip-row"><span class="team-chip" id="team-chip"></span>
+      <button class="team-change" onclick="switchRole()">เปลี่ยนฝ่าย</button></div>
     <div class="role-grid">
     <button class="role-tile" onclick="enterRole('offer')">
       <span class="tile-ic tile-ic-offer"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
@@ -1224,33 +1253,14 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
     <div class="login-logo">SUN<span>FOOD</span></div>
     <div class="login-subtitle">Inquiry Form</div>
     <div class="login-label">เลือกชื่อผู้ใช้</div>
-    <div class="team-block">
-      <div class="team-name">Export Sales Team</div>
-      <div class="user-grid">
-        <button class="user-btn" data-user="NICHA" data-team="Export Sales Team">NICHA</button>
-        <button class="user-btn" data-user="NET" data-team="Export Sales Team">NET</button>
-        <button class="user-btn" data-user="KAN" data-team="Export Sales Team">KAN</button>
-        <button class="user-btn" data-user="EMMA" data-team="Export Sales Team">EMMA</button>
-        <button class="user-btn" data-user="MAI" data-team="Export Sales Team">MAI</button>
-      </div>
-    </div>
-    <div class="team-block">
-      <div class="team-name">Food Supply Chain</div>
-      <div class="user-grid">
-        <button class="user-btn" data-user="MAY" data-team="Food Supply Chain">MAY</button>
-        <button class="user-btn" data-user="MILK" data-team="Food Supply Chain">MILK</button>
-        <button class="user-btn" data-user="ANCHAN" data-team="Food Supply Chain">ANCHAN</button>
-        <button class="user-btn" data-user="TIK" data-team="Food Supply Chain">TIK</button>
-        <button class="user-btn" data-user="ICE" data-team="Food Supply Chain">ICE</button>
-      </div>
-    </div>
+    <div id="login-users"></div>
     <div class="login-footer">SUNFOOD INTERNATIONAL · INQUIRY FORM</div>
   </div>
 </div>
 
 <header class="site-header">
   <div class="logo-text is-home" onclick="switchRole()" title="กลับหน้าหลัก">SUN<span>FOOD</span></div>
-  <div class="header-tag">INQUIRY FROM CUSTOMER</div>
+  <div class="header-tag" id="offer-header-tag">INQUIRY FROM CUSTOMER</div>
   <div class="user-tag" id="user-tag"></div>
 </header>
 
@@ -1436,8 +1446,8 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
       <div class="set-hint">ลิงก์เข้าโหมดตรง — คัดลอกไปส่งให้ทีม จะเปิดเข้าหน้านั้นทันทีไม่ต้องเลือกโหมด</div>
       <div class="set-rows" id="set-modelinks"></div>
       <div class="set-links" style="margin-top:14px">
-        <a class="set-btn" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/15fxIAqk32f898h4nN-CG1HstFe3GPSy-33ALiJlJHwU/edit">เปิดชีท Offer</a>
-        <a class="set-btn" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/1ZKrNVK1Mgffl1UqTGw8QxMld3hpTnlfZgpcgrwoNyHU/edit">เปิดชีท Approval</a>
+        <a class="set-btn" target="_blank" rel="noopener" id="set-sheet-offer" href="https://docs.google.com/spreadsheets/d/15fxIAqk32f898h4nN-CG1HstFe3GPSy-33ALiJlJHwU/edit">เปิดชีท Offer</a>
+        <a class="set-btn" target="_blank" rel="noopener" id="set-sheet-approve" href="https://docs.google.com/spreadsheets/d/1ZKrNVK1Mgffl1UqTGw8QxMld3hpTnlfZgpcgrwoNyHU/edit">เปิดชีท Approval</a>
         <a class="set-btn" target="_blank" rel="noopener" href="https://github.com/nichasenapeng/Offer_price">โค้ดระบบ (GitHub)</a>
       </div>
     </div>
@@ -2455,6 +2465,63 @@ window.addEventListener('pagehide', function() { if (draftTimer_) draftSaveNow_(
 /* รหัสผ่านผู้อนุมัติ — กันคนกดผิดหน้าเท่านั้น ไม่ใช่ระบบยืนยันตัวตนจริง
    ไฟล์นี้เป็น HTML ล้วนที่เปิดสาธารณะ ใครกด View Source ก็เห็นค่านี้ */
 var PASS = 'approvexx';
+
+/* ── 2 ฝ่าย แยกชีท แยก Apps Script แยกผู้อนุมัติ/รหัสผ่าน (12 ต.ค. 2026) ──
+   ฟอร์มและขั้นตอนเหมือนกันทุกอย่าง ต่างกันที่ข้อมูล: offerUrl = Script 1 (รับใบเสนอราคา)
+   approveUrl = Script 2 (อ่านทั้งหมด + เขียนผลอนุมัติ) ลิงก์ชีทใช้ในหน้า Setting
+   ฝ่ายที่ยังไม่มี URL หรือรหัสผ่านจะเปิดไม่ได้ — กันไม่ให้ขึ้น "ส่งสำเร็จ" ทั้งที่ไม่ได้บันทึกอะไร */
+var TEAMS = {
+  'export': {
+    name: 'Export Sales Team', short: 'Export Sales',
+    users: ['NICHA', 'NET', 'EMMA', 'MAI'],
+    offerUrl:   'https://script.google.com/macros/s/AKfycbyAfBG-BNJfw7y7MnbC6t4zC4Vckewu-VGQBBgSnEhAXqHEYRyFxjmKuvoLZxpM-Lw/exec',
+    approveUrl: 'https://script.google.com/macros/s/AKfycbzaa16CiQbLUhCNTiIkVSuFhCfEgrYsz342t6GmOc1c-IY3KiOEmvS4ZWXcZHwMAtTS/exec',
+    pass: 'approvexx',
+    sheetOffer:   'https://docs.google.com/spreadsheets/d/15fxIAqk32f898h4nN-CG1HstFe3GPSy-33ALiJlJHwU/edit',
+    sheetApprove: 'https://docs.google.com/spreadsheets/d/1ZKrNVK1Mgffl1UqTGw8QxMld3hpTnlfZgpcgrwoNyHU/edit'
+  },
+  'fsc': {
+    name: 'Food Supply Chain', short: 'FSC',
+    users: ['MAY', 'MILK', 'ANCHAN', 'TIK', 'ICE'],
+    offerUrl:   'https://script.google.com/macros/s/AKfycbwOUkWMNuzkQsI7deohAU0ydladqk9ZG6_vvNP8ymQz-nb67S-0u-FsdoYEVJ-9Xz8-/exec',   // Script 1 ของ FSC "FSC offer - รับใบเสนอราคา"
+    approveUrl: 'https://script.google.com/macros/s/AKfycbzY6l21y7GPiEpqzv1GBEiSL6C7oEyhFoY5TBMUqpR6N_Nw08GGMnNUqB3ZXfWyKp0/exec',   // Script 2 ของ FSC "FSC offer"
+    pass: 'approve',  // รหัสผ่านผู้อนุมัติของ FSC (แยกจาก Export Sales)
+    sheetOffer:   'https://docs.google.com/spreadsheets/d/1mS67vFfWRg2E_-T-UZ6fqOkDFUJuz_fPem6d_P43KwQ/edit',
+    sheetApprove: 'https://docs.google.com/spreadsheets/d/1l_qOicEElRvnVsUH-ES_RJbHRhvq-lle006DiY6bFfs/edit'
+  }
+};
+function teamReady_(key) { var t = TEAMS[key]; return !!(t && t.offerUrl && t.approveUrl && t.pass); }
+window._team = 'export';
+function setTeam_(key) {
+  if (!TEAMS[key]) key = 'export';
+  var t = TEAMS[key];
+  window._team = key;
+  APPS_SCRIPT_URL = t.offerUrl;
+  API_URL = t.approveUrl;
+  PASS = t.pass;
+  var chip = document.getElementById('team-chip'); if (chip) chip.textContent = t.name;
+  var ah = document.querySelector('#approve-app .hdr-sub'); if (ah) ah.textContent = 'Offer Approval Dashboard' + teamSuffix_();
+  var sh = document.querySelector('#setting-app .header-tag'); if (sh) sh.textContent = 'SETTING' + teamSuffix_().toUpperCase();
+  var oh = document.getElementById('offer-header-tag'); if (oh) oh.textContent = t.name.toUpperCase() + ' · INQUIRY FROM CUSTOMER';
+  var so = document.getElementById('set-sheet-offer'); if (so) so.href = t.sheetOffer;
+  var sa = document.getElementById('set-sheet-approve'); if (sa) sa.href = t.sheetApprove;
+  var lu = document.getElementById('login-users');
+  if (lu) {
+    lu.innerHTML = '<div class="team-block"><div class="team-name">' + t.name + '</div><div class="user-grid">' +
+      t.users.map(function(u) { return '<button class="user-btn" data-user="' + u + '" data-team="' + t.name + '">' + u + '</button>'; }).join('') +
+      '</div></div>';
+  }
+}
+function teamSuffix_() { return ' · ' + (TEAMS[window._team] || TEAMS['export']).name; }
+function pickTeam(key) {
+  if (!teamReady_(key)) {
+    alert('ฝ่าย ' + (TEAMS[key] ? TEAMS[key].name : key) + ' ยังไม่พร้อมใช้งาน — ระบบหลังบ้านยังตั้งค่าไม่เสร็จ');
+    return;
+  }
+  setTeam_(key);
+  document.getElementById('team-overlay').style.display = 'none';
+  document.getElementById('role-overlay').style.display = '';
+}
 var curUser = null, curKey = null, curFilter = 'pending';
 var approvals = {};
 
@@ -2996,6 +3063,7 @@ var _PLACEHOLDER = [
 function doLogin() {
   var pwEl = document.getElementById('pw');
   var err  = document.getElementById('pw-err');
+  if (!PASS) { alert('ฝ่ายนี้ยังไม่ได้ตั้งรหัสผ่านผู้อนุมัติ'); return; }
   if (!pwEl || pwEl.value !== PASS) {
     if (err) err.classList.add('show');
     if (pwEl) { pwEl.value = ''; pwEl.focus(); }
@@ -4560,6 +4628,7 @@ function clearLocalCopies() {
 function modeLink(mode) {
   var u = new URL(location.href);
   u.searchParams.delete('demo');
+  u.searchParams.set('team', window._team || 'export');
   u.searchParams.set('mode', mode);
   return u.toString();
 }
@@ -4624,7 +4693,7 @@ function enterRole(role) {
     var hd0 = document.querySelector('#approve-app .section-heading h2');
     if (hd0) hd0.textContent = 'สรุปการปิดการขายรายวัน';
     var sub0 = document.querySelector('#approve-app .hdr-sub');
-    if (sub0) sub0.textContent = 'Daily Sales Summary';
+    if (sub0) sub0.textContent = 'Daily Sales Summary' + teamSuffix_();
     var lbl = {'st-total':['วันที่มีการปิดขาย','Days'], 'st-pend':['ดีลที่ปิดได้','Deals Won'], 'st-appr':['ปริมาณรวม (MT)','Total Volume'], 'st-rej':['มูลค่ารวม (USD)','Total Value']};
     Object.keys(lbl).forEach(function(id){
       var v = document.getElementById(id); if (!v) return;
@@ -4665,7 +4734,7 @@ function enterRole(role) {
     var hd = document.querySelector('#approve-app .section-heading h2');
     if (hd) hd.textContent = 'ติดตามผลการขาย (หลังอนุมัติ)';
     var sub = document.querySelector('#approve-app .hdr-sub');
-    if (sub) sub.textContent = 'Sales Status Tracker';
+    if (sub) sub.textContent = 'Sales Status Tracker' + teamSuffix_();
     document.getElementById('ap-login-overlay').style.display = 'none';
     document.getElementById('hdr-user').textContent = 'ดูสถานะ (อ่านอย่างเดียว)';
     var lo = document.querySelector('#approve-app .btn-logout');
@@ -4680,14 +4749,22 @@ function switchRole() {
   // กลับหน้าหลัก: ตัด ?mode= ออก ไม่งั้นจะเด้งเข้าโหมดเดิมซ้ำ
   var u = new URL(location.href);
   u.searchParams.delete('mode');
+  u.searchParams.delete('team');
   location.href = u.toString();
 }
 
 /* เปิดโหมดตรงจากลิงก์ เช่น ?mode=offer */
 (function() {
-  var m = new URLSearchParams(location.search).get('mode');
-  if (['offer','approve','status','summary','setting'].indexOf(m) !== -1) {
-    enterRole(m);
+  var qs = new URLSearchParams(location.search);
+  var m = qs.get('mode'), t = qs.get('team');
+  var validMode = ['offer','approve','status','summary','setting'].indexOf(m) !== -1;
+  // ลิงก์เก่าที่ไม่มี ?team= (เช่นที่ส่งในกลุ่ม LINE) คือฝ่าย Export Sales
+  if (!t && validMode) t = 'export';
+  if (t && TEAMS[t]) {
+    if (!teamReady_(t)) { pickTeam(t); return; }   // เตือนแล้วค้างที่หน้าเลือกฝ่าย
+    setTeam_(t);
+    document.getElementById('team-overlay').style.display = 'none';
+    if (validMode) enterRole(m); else document.getElementById('role-overlay').style.display = '';
   }
 })();
 

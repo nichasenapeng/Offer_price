@@ -469,6 +469,39 @@ Script 2 อยู่ที่โปรเจกต์ `18PRGRxI9Ddfnt5fnKxkX9NW
 
 ---
 
+## แยก 2 ฝ่าย: Export Sales / Food Supply Chain (12 ต.ค. 2026)
+
+หน้าแรกเป็นปุ่มเลือกฝ่ายก่อน แล้วค่อยเลือกโหมด (Offer / Approve / Status / Summary / Setting) แต่ละฝ่ายมี**ชีทและ Apps Script ของตัวเอง
+ผู้อนุมัติและรหัสผ่านของตัวเอง** ฟอร์มกับขั้นตอนเหมือนกันทุกอย่าง ข้อมูลเดิมทั้งหมดอยู่กับ Export Sales ตามเดิม FSC เริ่มชีทใหม่
+- ตั้งค่าอยู่ที่ตัวแปร `TEAMS` (ใน `<script>` ตัวที่สอง): `users`, `offerUrl` (Script 1), `approveUrl` (Script 2), `pass`, ลิงก์ชีท
+- `setTeam_(key)` สลับ `APPS_SCRIPT_URL` / `API_URL` / `PASS`, วาดปุ่มรายชื่อผู้ใช้ในหน้า login ของฟอร์ม และเติมชื่อฝ่ายที่หัวหน้าจอ
+- ลิงก์ใช้ `?team=export|fsc&mode=...` · **ลิงก์เก่าที่ไม่มี `?team=` คือ Export Sales** (ลิงก์ในกลุ่ม LINE ยังใช้ได้)
+- กดโลโก้ SUNFOOD = กลับหน้าเลือกฝ่าย (`switchRole()` ตัดทั้ง `mode` และ `team`)
+- ฝ่ายที่ยังไม่มี URL หรือรหัสผ่าน (`teamReady_()`) เปิดไม่ได้ เพราะมิฉะนั้นฟอร์มจะขึ้น "ส่งสำเร็จ" โดยไม่ได้บันทึกอะไร
+  และรหัสผ่านว่างจะเข้าหน้าอนุมัติได้ด้วยช่องว่าง `doLogin()` จึงกันไว้
+- ลบ KAN ออกจากรายชื่อแล้ว (ใบเก่าของ KAN ยังอยู่ในข้อมูล แสดงตามปกติ)
+- LINE ของ FSC: ยังไม่แจ้งเตือน (สำเนา Script 2 ไม่มี Script Properties เลยข้ามอัตโนมัติ)
+
+**ระบบหลังบ้านของ FSC สร้างเสร็จแล้ว (12 ต.ค. 2026)** เจ้าของ nichasenapeng13@gmail.com — ชีทแยกกันจริง ไม่ใช้ร่วมกับ Export Sales
+| | ชีท | Apps Script | Web app URL |
+|---|---|---|---|
+| รับใบเสนอราคา (Script 1) | `FSC _ OFFER` `1mS67vFfWRg2E_-T-UZ6fqOkDFUJuz_fPem6d_P43KwQ` | "FSC offer - รับใบเสนอราคา" `16aAo2heci4rh2jmY6K6lTcWjfNBGTAfWeGskfmqo_V_j4-CsX7_qT-0f` | `AKfycbwOUkWMNuzkQsI7deohAU0ydladqk9ZG6_vvNP8ymQz-nb67S-0u-FsdoYEVJ-9Xz8-` |
+| อนุมัติ + อ่านทั้งหมด (Script 2) | `FSC _ APPROVE` `1l_qOicEElRvnVsUH-ES_RJbHRhvq-lle006DiY6bFfs` | "FSC offer" `1wRZozhZnt0-0yt36I7P1VNs5ZVsOTmAIAy0-Yxty1ibs6YI-fOsw3u4F` | `AKfycbzY6l21y7GPiEpqzv1GBEiSL6C7oEyhFoY5TBMUqpR6N_Nw08GGMnNUqB3ZXfWyKp0` |
+
+ทำมาจากการคัดลอกชีทเดิมทั้งสองใบ (สคริปต์ที่ผูกกับชีทถูกคัดลอกมาด้วย) แล้ว**แก้ `SHEET_ID` / `SHEET1_ID` / `SHEET2_ID` ให้ชี้ชีท FSC**
+ล้างแถวข้อมูลที่ติดมา (เก็บหัวตาราง) ลบฟังก์ชันล้างข้อมูลชั่วคราวทิ้ง และ deploy เป็น Web app (Execute as me, Anyone) ตรวจแล้ว
+- Script 2 ของ FSC ตอบ 0 ใบ ขณะที่ของ Export Sales เดิมตอบ 138 ใบ (แยกกันจริง)
+- ไม่มี ID ของชีทเดิมเหลือในโค้ดสำเนาทั้งสองตัว · ชีท Export Sales เดิมไม่ถูกแตะ
+- Script 2 ของ FSC **ไม่มี LINE** (ไม่มี Script Properties) `pushLine_` ข้ามเอง ถ้าจะเปิดทีหลังต้องตั้ง `LINE_TOKEN` / `LINE_TO` ที่ตัวนั้น
+  และแก้ `STATUS_URL` (ตั้งเป็น `?team=fsc&mode=status` ไว้แล้ว)
+- ถ้าแก้โค้ด Apps Script ของฝ่ายใด ต้อง Deploy → จัดการ → แก้ตัวเดิม → New version ที่โปรเจกต์ของฝ่ายนั้นเท่านั้น (ข้อกำหนดเดิม)
+  และสองฝ่ายใช้โค้ดชุดเดียวกัน แก้ฝั่งหนึ่งแล้วอย่าลืมแก้อีกฝั่งด้วย (ตอนนี้ไม่มีกลไก sync)
+- ลิงก์ในหน้า Setting ของแต่ละฝ่ายชี้ชีทของฝ่ายนั้น
+
+**รหัสผ่านผู้อนุมัติ FSC:** `approve` (ตัวแปร `TEAMS.fsc.pass`) แยกจากของ Export Sales (`approvexx`) เปลี่ยนรหัสของฝ่ายไหน แก้ที่ `TEAMS` ของฝ่ายนั้นแล้ว deploy
+
+**ยังไม่เคยทดสอบเขียนข้อมูลจริงกับ FSC** — ใบแรกของ FSC ให้เช็คว่าแถวลงชีท `FSC _ OFFER` ไม่ใช่ชีท Export Sales แล้วลองอนุมัติ → ปิดการขาย
+
 ## Draft — ใบที่กรอกค้างไว้ (29 ก.ย. 2026)
 
 หน้าเสนอราคาบันทึกฟอร์มเป็น draft เองระหว่างกรอก แล้วกลับมากรอกต่อได้ **เก็บใน `localStorage` ของเครื่องนั้น**
