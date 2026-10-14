@@ -1446,7 +1446,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
       <span class="set-saved" id="set-saved"></span>
     </div>
 
-    <div class="set-card">
+    <div class="set-card" id="set-freight-card">
       <div class="set-title">ค่าเฟรทรายเดือน (แยกตาม Port)</div>
       <div class="set-hint">ระบบจะดึงค่าเฟรทมาใส่ให้อัตโนมัติ เมื่อท่าเรือปลายทางในใบเสนอราคาตรงกับรายการด้านล่าง</div>
       <div class="set-field" style="max-width:220px;margin-bottom:14px">
@@ -2525,6 +2525,8 @@ function setTeam_(key) {
   var ah = document.querySelector('#approve-app .hdr-sub'); if (ah) ah.textContent = 'Offer Approval Dashboard' + teamSuffix_();
   var sh = document.querySelector('#setting-app .header-tag'); if (sh) sh.textContent = 'SETTING' + teamSuffix_().toUpperCase();
   var oh = document.getElementById('offer-header-tag'); if (oh) oh.textContent = t.name.toUpperCase() + ' · INQUIRY FROM CUSTOMER';
+  // ตารางค่าเฟรทรายเดือนใช้เฉพาะ Export Sales — FSC ไม่แสดงในหน้าตั้งค่า
+  var fc = document.getElementById('set-freight-card'); if (fc) fc.style.display = key === 'fsc' ? 'none' : '';
   var so = document.getElementById('set-sheet-offer'); if (so) so.href = t.sheetOffer;
   var sa = document.getElementById('set-sheet-approve'); if (sa) sa.href = t.sheetApprove;
   var lu = document.getElementById('login-users');
