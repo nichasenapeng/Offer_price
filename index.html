@@ -1150,6 +1150,9 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
 .team-tile.not-ready{opacity:.55}
 .team-chip-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 22px;flex-wrap:wrap}
 .team-chip{font-family:"Kanit",sans-serif;font-weight:600;font-size:14px;color:var(--ink);background:rgba(166,61,95,.1);border:1px solid rgba(166,61,95,.3);border-radius:999px;padding:5px 16px}
+.gate-btn{width:100%;margin-top:6px;border:0;border-radius:12px;padding:13px 16px;background:linear-gradient(135deg,#A63D5F,#7E2C48);color:#fff;font-family:"Kanit",sans-serif;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(166,61,95,.35);transition:transform .15s,box-shadow .15s}
+.gate-btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(166,61,95,.45)}
+.gate-btn:active{transform:translateY(0) scale(.99)}
 .team-change{border:0;background:transparent;color:var(--ink-muted);font-family:"Sarabun",sans-serif;font-size:13px;text-decoration:underline;cursor:pointer}
 .team-change:hover{color:var(--red)}
 .role-tile{
@@ -1204,6 +1207,23 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
       </button>
     </div>
     <div class="role-footer">SUNFOOD INTERNATIONAL</div>
+  </div>
+</div>
+
+<div class="role-overlay" id="gate-overlay" style="display:none">
+  <div class="role-card" style="width:440px">
+    <div class="role-logo">SUN<span>FOOD</span></div>
+    <div class="role-sub" style="margin-bottom:14px">Offer &amp; Approval System</div>
+    <div class="team-chip-row"><span class="team-chip" id="gate-chip"></span></div>
+    <div class="ap-login-hint" style="margin-bottom:12px">กรอกรหัสผ่านเพื่อเข้าฝ่ายนี้</div>
+    <div class="pw-wrap">
+      <input class="pw-input" id="gate-pw" type="password" placeholder="รหัสผ่าน" maxlength="30"
+        autocomplete="off" aria-label="รหัสผ่านเข้าฝ่าย" aria-describedby="gate-err"
+        onkeydown="if(event.key==='Enter')submitGate()">
+    </div>
+    <div class="pw-err" id="gate-err" role="alert">รหัสผ่านไม่ถูกต้อง</div>
+    <button class="gate-btn" onclick="submitGate()">เข้าสู่ระบบ →</button>
+    <div style="margin-top:14px"><button class="team-change" onclick="switchRole()">← เลือกฝ่ายอื่น</button></div>
   </div>
 </div>
 
@@ -2477,6 +2497,7 @@ var TEAMS = {
     offerUrl:   'https://script.google.com/macros/s/AKfycbyAfBG-BNJfw7y7MnbC6t4zC4Vckewu-VGQBBgSnEhAXqHEYRyFxjmKuvoLZxpM-Lw/exec',
     approveUrl: 'https://script.google.com/macros/s/AKfycbzaa16CiQbLUhCNTiIkVSuFhCfEgrYsz342t6GmOc1c-IY3KiOEmvS4ZWXcZHwMAtTS/exec',
     pass: 'approvexx',
+    gate: 'Ex@2027',   // รหัสก่อนเข้าฝ่าย (แยกจากรหัสผู้อนุมัติ)
     sheetOffer:   'https://docs.google.com/spreadsheets/d/15fxIAqk32f898h4nN-CG1HstFe3GPSy-33ALiJlJHwU/edit',
     sheetApprove: 'https://docs.google.com/spreadsheets/d/1ZKrNVK1Mgffl1UqTGw8QxMld3hpTnlfZgpcgrwoNyHU/edit'
   },
@@ -2486,6 +2507,7 @@ var TEAMS = {
     offerUrl:   'https://script.google.com/macros/s/AKfycbwOUkWMNuzkQsI7deohAU0ydladqk9ZG6_vvNP8ymQz-nb67S-0u-FsdoYEVJ-9Xz8-/exec',   // Script 1 ของ FSC "FSC offer - รับใบเสนอราคา"
     approveUrl: 'https://script.google.com/macros/s/AKfycbzY6l21y7GPiEpqzv1GBEiSL6C7oEyhFoY5TBMUqpR6N_Nw08GGMnNUqB3ZXfWyKp0/exec',   // Script 2 ของ FSC "FSC offer"
     pass: 'approve',  // รหัสผ่านผู้อนุมัติของ FSC (แยกจาก Export Sales)
+    gate: 'Fsc@27',   // รหัสก่อนเข้าฝ่าย
     sheetOffer:   'https://docs.google.com/spreadsheets/d/1mS67vFfWRg2E_-T-UZ6fqOkDFUJuz_fPem6d_P43KwQ/edit',
     sheetApprove: 'https://docs.google.com/spreadsheets/d/1l_qOicEElRvnVsUH-ES_RJbHRhvq-lle006DiY6bFfs/edit'
   }
@@ -2512,15 +2534,49 @@ function setTeam_(key) {
       '</div></div>';
   }
 }
+/* รหัสก่อนเข้าฝ่าย — ผ่านแล้วจำไว้จนปิดแท็บ (sessionStorage) จะได้ไม่ต้องกรอกซ้ำทุกครั้งที่กดโลโก้กลับหน้าหลัก
+   กันคนเข้าผิดฝ่ายหรือคนนอกที่บังเอิญได้ลิงก์เท่านั้น ไม่ใช่ระบบยืนยันตัวตน: รหัสอยู่ในโค้ดหน้าเว็บที่เปิดสาธารณะ */
+function gateOk_(key) {
+  var g = (TEAMS[key] || {}).gate;
+  if (!g) return true;
+  try { return sessionStorage.getItem('sf_gate_' + key) === g; } catch (e) { return false; }
+}
+var gateTarget_ = null;
+function askGate_(key, onOk) {
+  gateTarget_ = { key: key, onOk: onOk };
+  document.getElementById('gate-chip').textContent = TEAMS[key].name;
+  var pw = document.getElementById('gate-pw'); pw.value = '';
+  document.getElementById('gate-err').classList.remove('show');
+  document.getElementById('team-overlay').style.display = 'none';
+  document.getElementById('gate-overlay').style.display = '';
+  setTimeout(function(){ pw.focus(); }, 60);
+}
+function submitGate() {
+  if (!gateTarget_) return;
+  var pw = document.getElementById('gate-pw');
+  var key = gateTarget_.key;
+  if (pw.value !== TEAMS[key].gate) {
+    document.getElementById('gate-err').classList.add('show');
+    pw.value = ''; pw.focus();
+    return;
+  }
+  try { sessionStorage.setItem('sf_gate_' + key, TEAMS[key].gate); } catch (e) {}
+  var ok = gateTarget_.onOk; gateTarget_ = null;
+  document.getElementById('gate-overlay').style.display = 'none';
+  ok();
+}
 function teamSuffix_() { return ' · ' + (TEAMS[window._team] || TEAMS['export']).name; }
 function pickTeam(key) {
   if (!teamReady_(key)) {
     alert('ฝ่าย ' + (TEAMS[key] ? TEAMS[key].name : key) + ' ยังไม่พร้อมใช้งาน — ระบบหลังบ้านยังตั้งค่าไม่เสร็จ');
     return;
   }
-  setTeam_(key);
-  document.getElementById('team-overlay').style.display = 'none';
-  document.getElementById('role-overlay').style.display = '';
+  var go = function() {
+    setTeam_(key);
+    document.getElementById('team-overlay').style.display = 'none';
+    document.getElementById('role-overlay').style.display = '';
+  };
+  if (gateOk_(key)) go(); else askGate_(key, go);
 }
 var curUser = null, curKey = null, curFilter = 'pending';
 var approvals = {};
@@ -4762,9 +4818,13 @@ function switchRole() {
   if (!t && validMode) t = 'export';
   if (t && TEAMS[t]) {
     if (!teamReady_(t)) { pickTeam(t); return; }   // เตือนแล้วค้างที่หน้าเลือกฝ่าย
-    setTeam_(t);
-    document.getElementById('team-overlay').style.display = 'none';
-    if (validMode) enterRole(m); else document.getElementById('role-overlay').style.display = '';
+    var enter = function() {
+      setTeam_(t);
+      document.getElementById('team-overlay').style.display = 'none';
+      if (validMode) enterRole(m); else document.getElementById('role-overlay').style.display = '';
+    };
+    // ลิงก์ตรง (รวมลิงก์เก่าในกลุ่ม LINE) ต้องผ่านรหัสก่อนเข้าเหมือนกัน
+    if (gateOk_(t)) enter(); else askGate_(t, enter);
   }
 })();
 
