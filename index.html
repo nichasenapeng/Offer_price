@@ -1150,6 +1150,8 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
 .team-tile.not-ready{opacity:.55}
 .team-chip-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 22px;flex-wrap:wrap}
 .team-chip{font-family:"Kanit",sans-serif;font-weight:600;font-size:14px;color:var(--ink);background:rgba(166,61,95,.1);border:1px solid rgba(166,61,95,.3);border-radius:999px;padding:5px 16px}
+/* ช่องค่าเฟรท / ปริมาณต่อตู้ / ค่าเงิน / ราคาสุทธิ — ใช้เฉพาะ Export Sales ซ่อนทั้งก้อนเมื่อเป็น FSC */
+body.team-fsc .frt-only{display:none !important}
 .gate-btn{width:100%;margin-top:6px;border:0;border-radius:12px;padding:13px 16px;background:linear-gradient(135deg,#A63D5F,#7E2C48);color:#fff;font-family:"Kanit",sans-serif;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(166,61,95,.35);transition:transform .15s,box-shadow .15s}
 .gate-btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(166,61,95,.45)}
 .gate-btn:active{transform:translateY(0) scale(.99)}
@@ -1331,7 +1333,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
         <input id="c-port" type="text" list="port-list" autocomplete="off"
           placeholder="เลือกจากรายการ หรือพิมพ์เอง เช่น Busan, South Korea" oninput="onPortChange()">
         <datalist id="port-list"></datalist>
-        <div class="port-frt" id="port-frt" style="display:none"></div>
+        <div class="port-frt frt-only" id="port-frt" style="display:none"></div>
       </div>
       <div class="g3">
         <div class="field">
@@ -1433,7 +1435,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
     <div class="header-tag">SETTING</div>
   </header>
   <div class="set-wrap">
-    <div class="set-card">
+    <div class="set-card frt-only" id="set-defaults-card">
       <div class="set-title">ค่าเริ่มต้นของฟอร์ม</div>
       <div class="set-hint">ค่าที่กรอกไว้จะถูกเติมให้อัตโนมัติทุกครั้งที่เพิ่มรายการสินค้าใหม่</div>
       <div class="set-grid">
@@ -1446,7 +1448,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
       <span class="set-saved" id="set-saved"></span>
     </div>
 
-    <div class="set-card" id="set-freight-card">
+    <div class="set-card frt-only" id="set-freight-card">
       <div class="set-title">ค่าเฟรทรายเดือน (แยกตาม Port)</div>
       <div class="set-hint">ระบบจะดึงค่าเฟรทมาใส่ให้อัตโนมัติ เมื่อท่าเรือปลายทางในใบเสนอราคาตรงกับรายการด้านล่าง</div>
       <div class="set-field" style="max-width:220px;margin-bottom:14px">
@@ -1637,6 +1639,7 @@ function fillPortList() {
 
 /* เติมค่าเฟรทจากตาราง — เติมช่องที่ว่าง หรือช่องที่เคยเติมอัตโนมัติไว้ */
 function applyFreightFromPort() {
+  if (window._team === 'fsc') return;
   var portEl = document.getElementById('c-port');
   var hit = lookupFreight(portEl ? portEl.value : '');
   document.querySelectorAll('#offer-app .prod-block').forEach(function(b) {
@@ -1655,7 +1658,7 @@ function applyFreightFromPort() {
 
 /* พิมพ์/เลือกท่าเรือแล้วอัปเดตทันที ไม่ต้องรอกดถัดไป */
 function onPortChange() {
-  var hit = lookupFreight(document.getElementById('c-port').value);
+  var hit = window._team === 'fsc' ? null : lookupFreight(document.getElementById('c-port').value);
   var box = document.getElementById('port-frt');
   if (box) {
     box.innerHTML = hit
@@ -1797,9 +1800,12 @@ function addProduct(data) {
   var id = prodCount;
   data = data || {};
   var cfg = getSettings();   // เติมค่าเริ่มต้นจากหน้าตั้งค่า
-  if (!data.fx && cfg.fx) data.fx = cfg.fx;
-  if (!data.mtPerCont && cfg.mtPerCont) data.mtPerCont = cfg.mtPerCont;
-  if (!data.freight) {
+  // FSC ไม่ใช้ค่าเฟรท — ไม่เติมค่าตั้งต้นหรือค่าจากตารางท่าเรือให้ ไม่งั้นไปติดใบโดยที่ทีมไม่เห็นช่อง
+  var noFrt = window._team === 'fsc';
+  if (!noFrt && !data.fx && cfg.fx) data.fx = cfg.fx;
+  if (!noFrt && !data.mtPerCont && cfg.mtPerCont) data.mtPerCont = cfg.mtPerCont;
+  if (noFrt) { data.fx = ''; data.mtPerCont = ''; data.freight = ''; }
+  else if (!data.freight) {
     var portEl = document.getElementById('c-port');
     var hit = lookupFreight(portEl ? portEl.value : '');
     if (hit) data.freight = hit.usd;
@@ -1858,7 +1864,7 @@ function addProduct(data) {
         '<input class="pp-valid date-pick" type="date" value="' + toISO_(data.valid) + '"></div>' +
     '</div>' +
 
-    '<div class="g3" style="margin-bottom:10px">' +
+    '<div class="g3 frt-only" style="margin-bottom:10px">' +
       '<div class="field"><label>ค่าเฟรท (USD ต่อตู้)</label>' +
         '<input class="pp-freight" type="text" inputmode="decimal" placeholder="เช่น 3000" value="' + (data.freight||'') + '" oninput="calcFreight(this)">' +
         '<div class="frt-src" style="display:none"></div></div>' +
@@ -1867,7 +1873,7 @@ function addProduct(data) {
       '<div class="field"><label>ค่าเงิน (THB ต่อ USD)</label>' +
         '<input class="pp-fx" type="text" inputmode="decimal" placeholder="เช่น 32.33" value="' + (data.fx||'') + '" oninput="calcFreight(this)"></div>' +
     '</div>' +
-    '<div class="frt-calc" style="display:none"></div>' +
+    '<div class="frt-calc frt-only" style="display:none"></div>' +
 
     /* ── Detail ── */
     '<div class="prod-offer-divider"></div>' +
@@ -2518,6 +2524,7 @@ function setTeam_(key) {
   if (!TEAMS[key]) key = 'export';
   var t = TEAMS[key];
   window._team = key;
+  document.body.classList.toggle('team-fsc', key === 'fsc');
   APPS_SCRIPT_URL = t.offerUrl;
   API_URL = t.approveUrl;
   PASS = t.pass;
@@ -2525,8 +2532,7 @@ function setTeam_(key) {
   var ah = document.querySelector('#approve-app .hdr-sub'); if (ah) ah.textContent = 'Offer Approval Dashboard' + teamSuffix_();
   var sh = document.querySelector('#setting-app .header-tag'); if (sh) sh.textContent = 'SETTING' + teamSuffix_().toUpperCase();
   var oh = document.getElementById('offer-header-tag'); if (oh) oh.textContent = t.name.toUpperCase() + ' · INQUIRY FROM CUSTOMER';
-  // ตารางค่าเฟรทรายเดือนใช้เฉพาะ Export Sales — FSC ไม่แสดงในหน้าตั้งค่า
-  var fc = document.getElementById('set-freight-card'); if (fc) fc.style.display = key === 'fsc' ? 'none' : '';
+  // body.team-fsc ซ่อนทุกอย่างที่เป็น .frt-only (ช่องเฟรทในฟอร์ม, การ์ดค่าเฟรท/ค่าเริ่มต้นในหน้าตั้งค่า)
   var so = document.getElementById('set-sheet-offer'); if (so) so.href = t.sheetOffer;
   var sa = document.getElementById('set-sheet-approve'); if (sa) sa.href = t.sheetApprove;
   var lu = document.getElementById('login-users');
