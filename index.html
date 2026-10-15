@@ -1423,6 +1423,7 @@ body.team-fsc .frt-only{display:none !important}
   <div class="success-title">ส่งคำขอสำเร็จแล้ว!</div>
   <div class="success-sub">ทีมขาย SunFood ได้รับข้อมูลของท่านแล้วค่ะ</div>
   <div class="success-ref" id="ref-number">REF: —</div>
+  <div class="success-note" id="auto-a1-note" style="display:none;font-weight:600"></div>
   <div class="success-note">ขอบคุณที่ไว้วางใจ SunFood International ค่ะ</div>
   <button class="btn-new" data-action="reset">+ กรอกใหม่</button>
 </div>
@@ -2171,6 +2172,7 @@ function submitWithRef_(refNum) {
       .then(function(res) { return res.json(); })
       .then(function(j) {
         if (j.status !== 'ok') throw new Error(j.msg || 'server error');
+        autoApproveA1_(payload);
         showSuccess(refNum);
       })
       .catch(function(err) {
@@ -2180,6 +2182,29 @@ function submitWithRef_(refNum) {
   } else {
     showSuccess(refNum);
   }
+}
+
+/* คนที่กรอกใบเป็น Approve 1 อยู่แล้ว (TEAMS.<ฝ่าย>.autoA1 เช่น NICHA) — ส่งใบสำเร็จแล้วเขียนผล Approve 1 = approved ให้เลย
+   ไม่ต้องไปกดซ้ำที่หน้า Approve ใบของคนอื่นไม่ถูกแตะ · ส่งแบบเดียวกับตอนกดโหวต แต่ไม่ใส่ event:'vote'
+   Apps Script จึงไม่แจ้ง LINE (LINE ส่งเฉพาะตอน Approve 2 อนุมัติ) ใบจะอยู่สถานะ partial รอ Approve 2 */
+var AUTO_A1_SELF_NOTE = 'อนุมัติอัตโนมัติ (ผู้กรอกใบเป็น Approve 1)';
+function autoApproveA1_(payload) {
+  var note = document.getElementById('auto-a1-note');
+  if (note) { note.style.display = 'none'; note.textContent = ''; }
+  var team = (typeof TEAMS !== 'undefined' && TEAMS[window._team]) || {};
+  if ((team.autoA1 || []).indexOf(payload.salesUser) === -1) return false;
+  var p0 = (payload.products || [])[0] || {};
+  var body = {
+    ref: payload.ref, company: payload.company || '', port: payload.port || '',
+    products: (payload.products || []).map(function(p){ return { type: p.type || '' }; }),
+    offerPrice: p0.offerPrice || '', offerMargin: p0.offerMargin || '',
+    qtyMonth: p0.qtyMonth || '', period: p0.period || '',
+    A1: 'approved', A2: '', status: 'partial',
+    remarkA1: AUTO_A1_SELF_NOTE, remarkA2: ''
+  };
+  fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(body) }).catch(function(){});
+  if (note) { note.textContent = 'Approve 1 อนุมัติให้อัตโนมัติแล้ว — รอ Approve 2'; note.style.display = 'block'; }
+  return true;
 }
 
 function showSuccess(refNum) {
@@ -2504,6 +2529,7 @@ var TEAMS = {
     approveUrl: 'https://script.google.com/macros/s/AKfycbzaa16CiQbLUhCNTiIkVSuFhCfEgrYsz342t6GmOc1c-IY3KiOEmvS4ZWXcZHwMAtTS/exec',
     pass: 'approvexx',
     gate: 'Ex@2027',   // รหัสก่อนเข้าฝ่าย (แยกจากรหัสผู้อนุมัติ)
+    autoA1: ['NICHA'], // คนกรอกใบที่เป็น Approve 1 ด้วย — ใบที่คนเหล่านี้ส่ง Approve 1 อนุมัติให้เลย
     sheetOffer:   'https://docs.google.com/spreadsheets/d/15fxIAqk32f898h4nN-CG1HstFe3GPSy-33ALiJlJHwU/edit',
     sheetApprove: 'https://docs.google.com/spreadsheets/d/1ZKrNVK1Mgffl1UqTGw8QxMld3hpTnlfZgpcgrwoNyHU/edit'
   },
