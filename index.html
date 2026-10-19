@@ -938,6 +938,11 @@ body::before, body::after { display: none !important; }
 #approve-app .close-remark{width:100%;font-weight:400;font-size:13px;font-family:"Sarabun",sans-serif;resize:vertical;line-height:1.5}
 #approve-app .close-remark-note{margin-top:10px;font-size:13px;color:var(--ink-soft);background:rgba(255,255,255,0.6);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:8px 12px}
 #approve-app .close-grid.ext-grid{grid-template-columns:1fr 2fr}
+#approve-app .close-prod{margin:0 0 14px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.6)}
+#approve-app .close-prod-name{font-family:"Kanit",sans-serif;font-weight:600;font-size:14px;color:var(--ink);margin-bottom:10px;overflow-wrap:anywhere}
+#approve-app .close-prod-name .cp-code{font-weight:400;font-size:12px;color:var(--ink-muted);margin-left:6px}
+#approve-app .close-prod-hint{font-size:12px;color:var(--ink-muted);margin:-4px 0 12px}
+#approve-app .close-skipped{font-size:13px;color:var(--ink-muted);margin-top:8px}
 @media(max-width:768px){#approve-app .close-grid{grid-template-columns:1fr 1fr}}
 /* จอแคบ: ช่องขอขยาย VALID ต้องเต็มความกว้าง ไม่งั้นพิมพ์รายละเอียดไม่ได้จริง */
 @media(max-width:560px){#approve-app .close-grid,#approve-app .close-grid.ext-grid{grid-template-columns:1fr}}
@@ -3813,12 +3818,119 @@ function deleteFeedback(ref, i) {
   renderCards();
 }
 
+/* ── ปิดการขายรายสินค้า ──
+   ใบที่เสนอหลายสินค้า ปิดได้ทีละสินค้า (ราคา/ปริมาณ/Shipment ไม่เหมือนกัน) เก็บในช่องเดิมของ สถานะรวม
+   closed-won|ship1 ;; ship2|qty1 ;; qty2|price1 ;; price2|margin1 ;; margin2|remark|date   เรียงตามลำดับสินค้าในใบ
+   สินค้าที่ยังไม่ปิดเว้นว่างทั้งแถว · ค่าที่ไม่มี ;; = ชุดเดียวของทั้งใบแบบเดิม ใบที่ปิดไปแล้วทุกใบอ่านได้เหมือนเดิม */
+var CLOSE_SEP = ' ;; ';
+function closeIsPerProduct_(av) {
+  return CLOSE_FIELDS.some(function(f){ return String((av || {})[f.key] || '').indexOf(';;') !== -1; });
+}
+function closeSplit_(raw, n) {
+  var arr = String(raw || '').split(';;').map(function(x){ return x.trim(); });
+  var out = [];
+  for (var i = 0; i < n; i++) out.push(arr[i] || '');
+  return out;
+}
+/* แถวผลการขายสำหรับแสดง/รวมยอด — ใบเก่า/สินค้าเดียวได้ 1 แถว ใบรายสินค้าได้ 1 แถวต่อสินค้าที่ปิด */
+function closeRows_(d, av) {
+  var prods = (d && d.products) || [];
+  av = av || {};
+  if (closeIsPerProduct_(av)) {
+    var cols = CLOSE_FIELDS.map(function(f){ return closeSplit_(av[f.key], prods.length); });
+    var rows = [];
+    prods.forEach(function(p, i) {
+      if (!cols.some(function(c){ return c[i]; })) return;
+      rows.push({ prod: p.type || '—', spec: p.spec || '', ship: cols[0][i], qty: cols[1][i], price: cols[2][i], margin: cols[3][i] });
+    });
+    return rows;
+  }
+  var names = prods.map(function(p){ return p.type || ''; }).filter(Boolean).join(', ') || '—';
+  return [{ prod: names, spec: '', ship: av.closeShipment || '', qty: av.closeQty || '', price: av.closePrice || '', margin: av.closeMargin || '' }];
+}
+function closeSkipped_(d, av) {
+  if (!closeIsPerProduct_(av)) return [];
+  var prods = (d && d.products) || [];
+  var cols = CLOSE_FIELDS.map(function(f){ return closeSplit_(av[f.key], prods.length); });
+  return prods.filter(function(p, i){ return !cols.some(function(c){ return c[i]; }); }).map(function(p){ return p.type || '—'; });
+}
+/* ราคาปิดการขายที่เติมให้ในช่องเลยหลังอนุมัติ = ราคาที่ผู้อนุมัติเคาะ (Approve 2 ก่อน ถ้าไม่ได้กรอกใช้ของ Approve 1
+   ไม่มีใครกรอก = อนุมัติตามราคาที่เสนอ) — ตัดหน่วยออกให้เหลือตัวเลข ("4,050 USD/MT" → 4050) ข้อความอย่าง "2650-2700" คงไว้ตามที่พิมพ์
+   ใบหลายสินค้าใช้ราคาที่อนุมัติของสินค้าชิ้นนั้น · ทีมขายแก้ได้ตามจริงก่อนกดปิดการขาย */
+function closePriceDefault_(d, i) {
+  var n = (d.products || []).length;
+  var p = (d.products || [])[i || 0] || {};
+  var raw;
+  if (n > 1 && apHasPerProduct_(d.ref)) raw = apPriceForProduct_(d.ref, d, i) || p.offerPrice;
+  else if (n > 1) raw = priceChanged_(d.ref, d) ? approvedPrice_(d.ref, d) : (p.offerPrice || d.offerPrice);
+  else raw = approvedPrice_(d.ref, d);
+  raw = String(raw || '').trim();
+  // ตัวเลขล้วน (มีหน่วย USD/MT ต่อท้ายได้) → ตัวเลข
+  var m = raw.match(/^\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(?:USD\s*\/\s*MT|USD|\$\s*\/\s*MT)?\s*$/i);
+  if (m) return m[1].replace(/,/g, '');
+  // ผู้อนุมัติบางคนพิมพ์ข้อความปนในช่องราคา ("ok krub แต่ให้ที่ 1 FCL/month", "3800, 4000")
+  // หน้า Summary อ่านราคาจากตัวเลขตัวแรก เติมตรง ๆ แล้วยอดเงินจะเพี้ยน จึงเติมเฉพาะเมื่อมีตัวเลขที่ดูเหมือนราคา (500–999,999)
+  // เพียงค่าเดียว ถ้าไม่มีหรือกำกวมหลายค่า ปล่อยว่างให้ทีมขายกรอกเอง (placeholder ยังโชว์ข้อความที่อนุมัติ)
+  var found = [], re = /\$?\s*(\d{1,3}(?:,\d{3})+|\d{3,6})(?:\.\d+)?/g, mm;
+  while ((mm = re.exec(raw)) !== null) {
+    var v = parseFloat(mm[1].replace(/,/g, ''));
+    if (v >= 500 && v <= 999999 && found.indexOf(v) === -1) found.push(v);
+  }
+  return found.length === 1 ? String(found[0]) : '';
+}
+/* ช่องกรอกราคาปิดของสินค้าชิ้นที่ i — placeholder ใช้ราคาที่อนุมัติของชิ้นนั้น ไม่มีก็ใช้ราคาที่เสนอของชิ้นนั้น */
+function closeHint_(d, i, f) {
+  var p = ((d && d.products) || [])[i] || {};
+  if (f.key === 'closePrice') {
+    var ap = apHasPerProduct_(d.ref) ? apPriceForProduct_(d.ref, d, i) : (priceChanged_(d.ref, d) ? approvedPrice_(d.ref, d) : '');
+    if (ap) return 'อนุมัติที่ ' + ap;
+  }
+  var v = ({ closeShipment: p.period, closeQty: p.qtyMonth, closePrice: p.offerPrice, closeMargin: p.offerMargin })[f.key] || d[f.from];
+  return v ? 'เสนอไว้ ' + (f.key === 'closeMargin' ? fmtMargin_(v) : v) : '—';
+}
+function closeProductInputs_(d, av) {
+  var prods = d.products || [];
+  var cols = CLOSE_FIELDS.map(function(f){ return closeIsPerProduct_(av) ? closeSplit_(av[f.key], prods.length) : prods.map(function(){ return ''; }); });
+  return '<div class="close-prod-hint">ใบนี้เสนอ ' + prods.length + ' สินค้า — กรอกผลของแต่ละสินค้า เว้นว่างทั้งแถวถ้าสินค้านั้นยังไม่ปิด</div>' +
+    prods.map(function(p, i) {
+      return '<div class="close-prod"><div class="close-prod-name">สินค้าที่ ' + (i + 1) + ': ' + draftEsc_(p.type || '—') +
+        (p.spec ? '<span class="cp-code">' + draftEsc_(p.spec) + '</span>' : '') + '</div><div class="close-grid">' +
+        CLOSE_FIELDS.map(function(f, k) {
+          return '<div class="close-field"><label>' + f.label + '</label>' +
+            '<input id="' + f.id + '-' + d.ref + '-' + i + '" class="close-input" type="text" placeholder="' + closeHint_(d, i, f) +
+            '" value="' + draftEsc_(cols[k][i] || (f.key === 'closePrice' ? closePriceDefault_(d, i) : '')) + '"></div>';
+        }).join('') + '</div></div>';
+    }).join('');
+}
+
 function closeSale(ref, result) {
   if (!approvals[ref]) approvals[ref] = {};
   var remEl = document.getElementById('close-remark-' + ref);
   var remark = remEl ? remEl.value.trim().replace(/\|/g, ' ') : '';
   var vals = null;
-  if (result === 'closed-won') {
+  var dOf = DATA.filter(function(x){ return x.ref === ref; })[0] || {};
+  var nProd = (dOf.products || []).length;
+  if (result === 'closed-won' && nProd > 1) {
+    var clean = function(v){ return String(v || '').trim().replace(/\|/g, '').replace(/;;/g, ';'); };
+    var cols = CLOSE_FIELDS.map(function(){ return []; });
+    var closedAny = false;
+    for (var pi = 0; pi < nProd; pi++) {
+      var els = CLOSE_FIELDS.map(function(f){ return document.getElementById(f.id + '-' + ref + '-' + pi); });
+      var vs = els.map(function(el){ return el ? clean(el.value) : ''; });
+      var filled = vs.filter(Boolean).length;
+      if (filled && filled < CLOSE_FIELDS.length) {
+        var miss = vs.indexOf('');
+        showToast('สินค้าที่ ' + (pi + 1) + ': กรุณากรอก "' + CLOSE_FIELDS[miss].label + '" (หรือเว้นว่างทั้งแถวถ้ายังไม่ปิด)', 'red');
+        if (els[miss]) els[miss].focus();
+        return;
+      }
+      if (filled) closedAny = true;
+      vs.forEach(function(v, k){ cols[k].push(v); });
+    }
+    if (!closedAny) { showToast('กรอกผลการขายอย่างน้อย 1 สินค้า', 'red'); return; }
+    vals = cols.map(function(c, k) { var j = c.join(CLOSE_SEP); approvals[ref][CLOSE_FIELDS[k].key] = j; return j; });
+    vals.push(remark);
+  } else if (result === 'closed-won') {
     vals = [];
     for (var i = 0; i < CLOSE_FIELDS.length; i++) {
       var f = CLOSE_FIELDS[i];
@@ -3847,7 +3959,9 @@ function closeSale(ref, result) {
   approvals[ref].closeDate = closeDate;
   var fbStr = fbSerialize_(approvals[ref].feedback);
   postSaleState(ref, vals ? result + '|' + vals.join('|') + (fbStr ? '|' + fbStr : '') : result);
-  var doneMsg = { 'closed-won': 'บันทึกแล้ว: ปิดการขายได้ ' + approvals[ref].closePrice + ' USD/MT',
+  var doneMsg = { 'closed-won': 'บันทึกแล้ว: ปิดการขายได้ ' + (closeIsPerProduct_(approvals[ref])
+                    ? closeRows_(dOf, approvals[ref]).length + ' สินค้า'
+                    : approvals[ref].closePrice + ' USD/MT'),
                   'closed-lost': 'บันทึกแล้ว: ไม่ปิดการขาย',
                   'not-offered': 'บันทึกแล้ว: ไม่เสนอราคานี้ให้ลูกค้า',
                   'idea-given':  'บันทึกแล้ว: ให้ไอเดียราคา — รอติดตามผล' };
@@ -4345,13 +4459,14 @@ function renderCards() {
       var closeInner;
       if (status === 'approved' || status === 'idea-given') {
         var isIdea = status === 'idea-given';
-        var inputs = CLOSE_FIELDS.map(function(f) {
+        var perProdForm = (d.products || []).length > 1;
+        var inputs = perProdForm ? closeProductInputs_(d, av) : CLOSE_FIELDS.map(function(f) {
           return '<div class="close-field"><label>' + f.label + '</label>' +
             '<input id="' + f.id + '-' + d.ref + '" class="close-input" type="text" placeholder="' +
             (f.key === 'closePrice' && priceChanged_(d.ref, d)
               ? 'อนุมัติที่ ' + approvedPrice_(d.ref, d)
               : (d[f.from] ? 'เสนอไว้ ' + (f.key === 'closeMargin' ? fmtMargin_(d[f.from]) : d[f.from]) : '—')) +
-            '" value="' + (av[f.key] || '') + '"></div>';
+            '" value="' + draftEsc_(av[f.key] || (f.key === 'closePrice' ? closePriceDefault_(d, 0) : '')) + '"></div>';
         }).join('');
         // ใบที่ให้ไอเดียไปแล้ว ยังปิดการขายต่อได้ — วันที่ของไอเดียไม่ใช่วันที่ปิดการขาย จึงเริ่มที่วันนี้
         closeInner = (isIdea
@@ -4362,7 +4477,7 @@ function renderCards() {
             : '') +
           '<div class="close-field close-date-wrap"><label>' + (isIdea ? 'วันที่ (ปิดการขาย / อัปเดตไอเดีย)' : 'วันที่ปิดการขาย') + '</label>' +
           dateInput('close-date-' + d.ref, isIdea ? todayISO() : (av.closeDate || todayISO())) + '</div>' +
-          '<div class="close-grid">' + inputs + '</div>' +
+          (perProdForm ? inputs : '<div class="close-grid">' + inputs + '</div>') +
           '<div class="close-field close-remark-wrap"><label>Remark (ถ้ามี)</label>' +
           '<textarea id="close-remark-' + d.ref + '" class="close-input close-remark" rows="2" placeholder="เช่น ลูกค้าขอเลื่อน shipment, ต่อรองราคาลง, คู่แข่งเสนอต่ำกว่า">' + (av.closeRemark || '') + '</textarea></div>' +
           '<div class="vote-buttons" style="margin-top:12px">' +
@@ -4373,12 +4488,26 @@ function renderCards() {
               (isIdea ? 'อัปเดตไอเดียราคา' : 'ให้ไอเดียราคา') + '</button>' +
           '</div>';
       } else if (status === 'closed-won') {
+        var perProdWon = closeIsPerProduct_(av);
         var cells = '<div class="close-cell"><div class="dl">วันที่ปิดการขาย</div><div class="dv">' + thaiDate(av.closeDate) + '</div></div>' +
-          CLOSE_FIELDS.map(function(f) {
+          (perProdWon ? '' : CLOSE_FIELDS.map(function(f) {
             return '<div class="close-cell"><div class="dl">' + f.label + '</div><div class="dv">' + (av[f.key] || '—') + '</div></div>';
-          }).join('');
+          }).join(''));
+        var wonTable = '';
+        if (perProdWon) {
+          var skipped = closeSkipped_(d, av);
+          wonTable = '<div class="card-products" style="padding:0;margin-top:10px"><table class="prod-table"><thead><tr><th>สินค้า</th>' +
+            CLOSE_FIELDS.map(function(f){ return '<th>' + f.label + '</th>'; }).join('') + '</tr></thead><tbody>' +
+            closeRows_(d, av).map(function(r) {
+              return '<tr><td><div class="pt">' + draftEsc_(r.prod) + '</div>' + (r.spec ? '<div class="pc">' + draftEsc_(r.spec) + '</div>' : '') + '</td>' +
+                '<td>' + (r.ship || '—') + '</td><td><b>' + (r.qty || '—') + '</b></td>' +
+                '<td><span class="pv">' + (r.price || '—') + '</span></td>' +
+                '<td><span class="mg ' + mgClass(r.margin) + '">' + (r.margin || '—') + '</span></td></tr>';
+            }).join('') + '</tbody></table></div>' +
+            (skipped.length ? '<div class="close-skipped">ยังไม่ปิด: ' + draftEsc_(skipped.join(', ')) + '</div>' : '');
+        }
         closeInner = '<div class="close-summary">' + cells +
-          '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">แก้ไข</button></div>' +
+          '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">แก้ไข</button></div>' + wonTable +
           (av.closeRemark ? '<div class="close-remark-note"><b>Remark:</b> ' + av.closeRemark + '</div>' : '') +
           fbBlock_(d, false);
       } else if (status === 'not-offered') {
@@ -4512,9 +4641,10 @@ function renderSummary_() {
 
   var grandQty = 0, grandVal = 0;
   won.forEach(function(d){
-    var av = approvals[d.ref] || {};
-    var q = numOf(av.closeQty, 'MT'), p = numOf(av.closePrice);
-    grandQty += q; grandVal += q * p;
+    closeRows_(d, approvals[d.ref]).forEach(function(r) {
+      var q = numOf(r.qty, 'MT'), p = numOf(r.price);
+      grandQty += q; grandVal += q * p;
+    });
   });
   var fmt = function(n, dec){ return n.toLocaleString('en-US', {minimumFractionDigits: dec||0, maximumFractionDigits: dec||0}); };
 
@@ -4553,19 +4683,23 @@ function renderSummary_() {
     var items = byDay[day];
     var dq = 0, dv = 0;
     items.forEach(function(it){
-      var q = numOf(it.av.closeQty, 'MT'), p = numOf(it.av.closePrice);
-      dq += q; dv += q * p;
+      closeRows_(it.d, it.av).forEach(function(r) {
+        var q = numOf(r.qty, 'MT'), p = numOf(r.price);
+        dq += q; dv += q * p;
+      });
     });
     var rows = items.map(function(it) {
-      var prod = (it.d.products || []).map(function(p){ return p.type || ''; }).filter(Boolean).join(', ') || '—';
-      return '<tr>' +
-        '<td><div class="pt">' + (it.d.company || '—') + '</div><div class="pc">' + it.d.ref + (it.d.salesUser ? ' · ' + it.d.salesUser : '') + '</div></td>' +
-        '<td style="color:var(--ink-soft)">' + prod + '</td>' +
-        '<td style="color:var(--ink-soft)">' + (it.av.closeShipment || '—') + '</td>' +
-        '<td><b>' + (it.av.closeQty || '—') + '</b></td>' +
-        '<td><span class="pv">' + (it.av.closePrice || '—') + '</span></td>' +
-        '<td><span class="mg ' + mgClass(it.av.closeMargin) + '">' + (it.av.closeMargin || '—') + '</span></td>' +
-        '</tr>' +
+      var crs = closeRows_(it.d, it.av);
+      return crs.map(function(r, ri) {
+        return '<tr>' +
+          (ri === 0 ? '<td rowspan="' + crs.length + '"><div class="pt">' + (it.d.company || '—') + '</div><div class="pc">' + it.d.ref + (it.d.salesUser ? ' · ' + it.d.salesUser : '') + '</div></td>' : '') +
+          '<td style="color:var(--ink-soft)">' + draftEsc_(r.prod) + '</td>' +
+          '<td style="color:var(--ink-soft)">' + (r.ship || '—') + '</td>' +
+          '<td><b>' + (r.qty || '—') + '</b></td>' +
+          '<td><span class="pv">' + (r.price || '—') + '</span></td>' +
+          '<td><span class="mg ' + mgClass(r.margin) + '">' + (r.margin || '—') + '</span></td>' +
+          '</tr>';
+      }).join('') +
         (it.av.closeRemark ? '<tr class="sum-remark"><td colspan="6"><b>Remark:</b> ' + it.av.closeRemark + '</td></tr>' : '');
     }).join('');
 
