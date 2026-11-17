@@ -2074,21 +2074,27 @@ function buildMeta_(p) {
   return parts.length ? '[' + parts.join(' | ') + '] ' : '';
 }
 
-/* REF สุ่ม 4 หลักชนกันได้จริง — SFD-2026-1612 ของ MITSUI (EMMA, 23 ก.ย.) ไปซ้ำกับใบ UMIOS (MAI, 21 ก.ย.)
-   Script 2 จัดกลุ่มตาม REF สินค้าของใบใหม่จึงไปต่อท้ายใบเก่าที่อนุมัติไปแล้ว
-   ก่อนส่งจึงดึงรายการ REF ที่มีอยู่มาเช็คก่อน ถ้าดึงไม่ได้ (เน็ตช้า/ล่ม) ยังส่งได้ โดยเช็คกับข้อมูลที่โหลดไว้ในเครื่อง */
-function newRef_() {
-  return 'SFD-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*9000)+1000);
+/* REF สุ่มชนกันได้จริง — SFD-2026-1612 (MITSUI/UMIOS 23 ก.ย.) · SFD-2026-2970 (HANWA/SINIORA 17 พ.ย. ซ้ำกันอีก) · SFD-2026-8361
+   Script 2 จัดกลุ่มตาม REF ใบที่ส่งทีหลังเลยไปรวมกับใบเก่า (ใบ MARUI ของ 8361 โดนมองเป็นถังขยะของ HT Foodtech มาทั้งเดือน)
+   ก่อนส่งจึงดึงรายการ REF ที่มีอยู่มาเช็ค — ของเดิมรอแค่ 8 วินาทีแล้วข้ามการเช็คแบบเงียบ ๆ (ชีท 300+ ใบ ดึงช้ากว่านั้นได้) และหน้า Offer
+   ไม่ได้โหลดข้อมูลไว้ให้เทียบเลย จึงสุ่มโดยไม่มีการป้องกัน เลข 4 หลักมี 9,000 ค่า ใช้ไปแล้ว ~3.5% ชนกันราว 1 ใน 30 ครั้ง
+   ตอนนี้รอ 25 วินาทีและลองใหม่อีกรอบ ถ้ายังดึงไม่ได้ ใช้เลข 5 หลัก (90,000 ค่า) แทน โอกาสชนลดลงราว 10 เท่า */
+function newRef_(wide) {
+  var n = wide ? Math.floor(Math.random()*90000)+10000 : Math.floor(Math.random()*9000)+1000;
+  return 'SFD-' + new Date().getFullYear() + '-' + String(n);
 }
 function pickUniqueRef_() {
   var taken = {};
   (typeof DATA !== 'undefined' && DATA || []).forEach(function(d){ taken[d.ref] = 1; });
-  var pick = function() {
-    for (var i = 0; i < 200; i++) { var r = newRef_(); if (!taken[r]) return r; }
-    return newRef_();
+  var pick = function(wide) {
+    for (var i = 0; i < 200; i++) { var r = newRef_(wide); if (!taken[r]) return r; }
+    return newRef_(true);
   };
-  var timeout = new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, 8000); });
-  return Promise.race([fetch(API_URL).then(function(res){ return res.json(); }), timeout])
+  var fetchRefs = function() {
+    var timeout = new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, 25000); });
+    return Promise.race([fetch(API_URL).then(function(res){ return res.json(); }), timeout]);
+  };
+  return fetchRefs().catch(function() { return fetchRefs(); })
     .then(function(j) {
       ((j && j.data) || []).forEach(function(row) {
         ['REF', 'Timestamp'].forEach(function(k) {
@@ -2096,9 +2102,9 @@ function pickUniqueRef_() {
           if (v.indexOf('SFD-') === 0) taken[v] = 1;
         });
       });
-      return pick();
+      return pick(false);
     })
-    .catch(function() { return pick(); });
+    .catch(function() { return pick(true); });
 }
 
 function submitForm() {
@@ -2182,6 +2188,8 @@ function submitWithRef_(refNum) {
       .then(function(res) { return res.json(); })
       .then(function(j) {
         if (j.status !== 'ok') throw new Error(j.msg || 'server error');
+        // ถ้า Script 1 เปลี่ยนเลขให้ (เลขซ้ำกับใบอื่นตอนเขียนลงชีท) ใช้เลขที่ server ยืนยัน ไม่งั้นหน้าสำเร็จจะบอกเลขที่ไม่มีอยู่จริง
+        if (j.ref && j.ref !== refNum) { payload.ref = j.ref; refNum = j.ref; }
         autoApproveA1_(payload);
         showSuccess(refNum);
       })
