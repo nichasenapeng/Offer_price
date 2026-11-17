@@ -768,6 +768,10 @@ body::before, body::after { display: none !important; }
 .fb-text{flex:1 1 auto;font-size:14px;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
 .fb-del{flex:0 0 auto;border:0;background:transparent;color:var(--ink-muted);font-size:16px;line-height:1;cursor:pointer;padding:0 4px}
 .fb-del:hover{color:var(--red)}
+#approve-app .fb-appr{margin:0 0 14px}
+#approve-app .fb-appr-banner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px;padding:10px 14px;border-radius:10px;background:#FEF3C7;border:1px solid #f0c76b;color:#8a5a08;font-size:14px;font-weight:600}
+#approve-app .fb-appr-idea{margin:0 0 10px;padding:8px 14px;border-radius:10px;background:rgba(255,255,255,.7);border:1px dashed var(--border);font-size:13px;color:var(--ink-soft);white-space:pre-wrap;overflow-wrap:anywhere}
+#approve-app .fb-appr-idea b{color:var(--ink)}
 .fb-empty{font-size:13px;color:var(--ink-muted);padding:2px 0 6px}
 .fb-form{margin-top:10px;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .fb-form .fb-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -1548,6 +1552,7 @@ body.team-fsc .frt-only{display:none !important}
   <button class="filter-btn" id="filter-superseded" onclick="setFilter('superseded',this)">bidding</button>
   <button class="filter-btn" id="filter-question" onclick="setFilter('question',this)">มีคำถาม</button>
   <button class="filter-btn" id="filter-ext" onclick="setFilter('ext-pending',this)">ขอขยาย VALID</button>
+  <button class="filter-btn" id="filter-fb" onclick="setFilter('fb-new',this)">💬 Feedback ใหม่</button>
   <button class="filter-btn" id="filter-deleted" onclick="setFilter('deleted',this)">ถังขยะ</button>
 </div>
 
@@ -3411,7 +3416,43 @@ var BID_DONE = ['approved', 'idea-given', 'closed-won', 'closed-lost', 'not-offe
 function biddingDone_(ref) {
   return bidChildren_(ref).some(function(x){ return BID_DONE.indexOf(getStatus(x.ref)) !== -1; });
 }
+/* ── Feedback ใหม่บนใบที่ให้ไอเดียราคา → แจ้งผู้อนุมัติในหน้า Approve ──
+   การ์ดไอเดียราคาไม่ได้อยู่ในหน้า Approve (ผู้อนุมัติตัดสินไปแล้ว) ทีมขายเพิ่ม feedback ผู้อนุมัติจึงไม่เห็น
+   แท็บ "💬 Feedback ใหม่" แสดงใบที่มี feedback ที่ยังไม่เคยกดรับทราบ — จำต่อเครื่อง (localStorage) เพราะ A1/A2 คนละเครื่อง
+   ต่างคนต่างเห็นแจ้งเตือนของตัวเองจนกว่าจะกดรับทราบ · นับเฉพาะ feedback ที่ลงวันที่ภายใน FB_NEW_DAYS วัน ไม่งั้นของเก่าทั้งหมดจะโผล่เป็น "ใหม่" ตอนเปิดครั้งแรก */
+var FB_SEEN_KEY = 'sf_fb_seen_v1', FB_NEW_DAYS = 14;
+function fbHash_(str) { var h = 5381; for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return String(h); }
+function fbSig_(ref) { return fbHash_(fbSerialize_((approvals[ref] || {}).feedback)); }
+function fbSeenMap_() { try { return JSON.parse(localStorage.getItem(FB_SEEN_KEY) || '{}') || {}; } catch (e) { return {}; } }
+function fbSetSeen_(ref) {
+  var m = fbSeenMap_(); m[ref] = fbSig_(ref);
+  try { localStorage.setItem(FB_SEEN_KEY, JSON.stringify(m)); } catch (e) {}
+}
+function fbUnseen_(ref) {
+  var list = (approvals[ref] || {}).feedback || [];
+  if (!list.length) return false;
+  var cutoff = shiftISO(-FB_NEW_DAYS);
+  if (!list.some(function(e){ return String(e.d || '') >= cutoff; })) return false;
+  return fbSeenMap_()[ref] !== fbSig_(ref);
+}
+function markFbSeen(ref) {
+  fbSetSeen_(ref);
+  showToast('รับทราบ feedback แล้ว', 'green');
+  renderCards();
+}
+/* กล่องบนการ์ดในหน้า Approve: ไอเดียราคาที่ทีมขายให้ไป + feedback ทั้งหมด + ปุ่มรับทราบ */
+function fbApproverBlock_(d) {
+  var av = approvals[d.ref] || {};
+  if (!(av.feedback || []).length) return '';
+  var unseen = fbUnseen_(d.ref);
+  return '<div class="fb-appr">' +
+    (unseen ? '<div class="fb-appr-banner"><span>💬 ทีมขายอัปเดต feedback จากลูกค้า — ใบนี้ให้ไอเดียราคาไปแล้ว</span>' +
+      '<button class="draft-btn primary" onclick="markFbSeen(\'' + d.ref + '\')">รับทราบ</button></div>' : '') +
+    (av.closeRemark ? '<div class="fb-appr-idea"><b>ไอเดียราคาที่ให้ลูกค้า' + (av.closeDate ? ' (' + thaiDate(av.closeDate) + ')' : '') + ':</b> ' + draftEsc_(av.closeRemark) + '</div>' : '') +
+    fbBlock_(d, false) + '</div>';
+}
 function inFilter_(d, f) {
+  if (f === 'fb-new') return getStatus(d.ref) === 'idea-given' && fbUnseen_(d.ref);
   var st = getStatus(d.ref);
   if (st !== f) return false;
   return !(f === 'superseded' && biddingDone_(d.ref));
@@ -3515,7 +3556,7 @@ function mgClass(m) {
 }
 
 // ── CLOSE SALE (โหมด Status) ──
-function postSaleState(ref, statusVal) {
+function postSaleState(ref, statusVal, extra) {
   var d = DATA.filter(function(x){ return x.ref === ref; })[0] || {};
   var av = approvals[ref] || {};
   var payload = {
@@ -3527,6 +3568,7 @@ function postSaleState(ref, statusVal) {
     remarkA1: buildApMeta_(av.apPriceA1) + (av.remarkA1 || ''),
     remarkA2: buildApMeta_(av.apPriceA2) + (av.remarkA2 || '')
   };
+  if (extra) Object.keys(extra).forEach(function(k){ payload[k] = extra[k]; });
   fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) }).catch(function(){});
 }
 /* ── ผู้อนุมัติมีคำถาม → ทีมขายตอบ → กลับมาเคาะใหม่ ── */
@@ -3804,6 +3846,7 @@ function addFeedback(ref) {
   if (!text) { showToast('พิมพ์ feedback ก่อน', 'red'); if (tEl) tEl.focus(); return; }
   (av.feedback = av.feedback || []).push({ d: (dEl && dEl.value) || todayISO(), t: text });
   av.feedback.sort(function(a, b){ return String(a.d).localeCompare(String(b.d)); });   // เรียงตามวันที่ ใส่ย้อนหลังก็ไม่ลำดับเพี้ยน
+  fbSetSeen_(ref);   // คนเพิ่มเองไม่ต้องเห็นเป็น "ใหม่" บนเครื่องตัวเอง
   postSaleState(ref, ideaStatusVal_(av));
   showToast('เพิ่ม feedback แล้ว', 'green');
   renderCards();
@@ -4135,12 +4178,31 @@ function useHintedPrice(ref, slot, price) {
   saveApprovedPrice(ref, slot);
 }
 
+/* ยกเลิกโหวต — เดิมลบเฉพาะในหน้าจอ ไม่เขียนลงชีท รีเฟรชแล้วค่ากลับมา (และ Script 2 เขียนค่าว่างทับไม่ได้)
+   ตอนนี้ส่ง undoSlots ไปให้ Script 2 (v20+ / FSC v2+) ล้างผลโหวต เวลา และราคาที่เคาะของช่องนั้นในชีท
+   สถานะรวมต้องคงสถานะที่ซ้อนอยู่ไว้ (คำถามค้าง / ขอขยาย VALID / ไอเดียราคา) ไม่ใช่เขียนทับด้วย pending เฉย ๆ */
 function undoVote(ref, slot) {
-  if (approvals[ref]) {
-    delete approvals[ref][slot];
-    delete approvals[ref][slot === 'A1' ? 'apPriceA1' : 'apPriceA2'];
+  var av = approvals[ref];
+  if (!av) return;
+  if (av.deleted || av.superseded || ['closed-won', 'closed-lost', 'not-offered'].indexOf(av.close) !== -1) {
+    showToast('ใบนี้ปิดการขาย/ถูกแทนที่แล้ว ยกเลิกโหวตไม่ได้ — ให้ทีมขายกด "แก้ไข" ที่หน้าเช็คสถานะก่อน', 'red');
+    return;
   }
-  showToast('ยกเลิก ' + slot + ' แล้ว');
+  saveRemarks();
+  var slots = [slot];
+  // A2 อนุมัติแล้วระบบเติม Approve 1 ให้อัตโนมัติ — ยกเลิก A2 ต้องเอา A1 ที่เติมให้ออกด้วย ไม่งั้นค้างเป็น "A1 อนุมัติ" ทั้งที่ไม่มีใครกด
+  if (slot === 'A2' && av.A1 === 'approved' && String(av.remarkA1 || '').trim() === AUTO_A1_NOTE) slots.push('A1');
+  slots.forEach(function(sl) {
+    delete av[sl];
+    delete av[sl === 'A1' ? 'apPriceA1' : 'apPriceA2'];
+  });
+  if (slots.indexOf('A1') !== -1 && slot === 'A2') av.remarkA1 = '';
+  var status = (av.close === 'idea-given') ? ideaStatusVal_(av)
+    : av.extState ? 'ext-' + av.extState + '|' + (av.extValid || '') + '|' + (av.extReason || '') + '|' + (av.extNote || '')
+    : av.question ? 'question|' + av.question + (av.questionReply ? '|' + av.questionReply : '')
+    : getStatus(ref);
+  postSaleState(ref, status, { undoSlots: slots });
+  showToast('ยกเลิก ' + slots.join(' + ') + ' แล้ว — บันทึกลงชีทแล้ว');
   renderCards();
 }
 
@@ -4387,6 +4449,7 @@ function renderCards() {
           (av.extNote ? '<div class="ext-reason">' + av.extNote + '</div>' : '') + '</div>';
       }
       approveHtml = '<div class="approve-section">' +
+        (status === 'idea-given' ? fbApproverBlock_(d) : '') +
         qBox + extDecide +
         '<div class="approve-slots">' +
           slotHtml('A1', dec1) +
@@ -4761,6 +4824,10 @@ function updateFilterCounts_(data) {
     paint(document.getElementById(id), n, !!needsAction[map[id]]);
   });
 
+  var fbN = (window._statusMode || window._summaryMode) ? 0 : data.filter(function(d){ return inFilter_(d, 'fb-new'); }).length;
+  var fbBtn = document.getElementById('filter-fb');
+  if (fbBtn) { fbBtn.dataset.base = '💬 Feedback ใหม่'; paint(fbBtn, fbN, true); }
+
   var extN = extPendingCount_(data);
   var extBtn = document.getElementById('filter-ext');
   if (extBtn) {
@@ -4774,7 +4841,7 @@ function updateFilterCounts_(data) {
     var total, label;
     if (window._summaryMode) { total = 0; }
     else if (window._statusMode) { total = count('approved') + count('question') + count('idea-given'); label = 'รอคุณดำเนินการ'; }
-    else { total = count('pending') + count('partial') + count('question') + extN; label = 'รอคุณดำเนินการ'; }
+    else { total = count('pending') + count('partial') + count('question') + extN + fbN; label = 'รอคุณดำเนินการ'; }
     pill.style.display = total ? 'inline-flex' : 'none';
     pill.innerHTML = '<span class="notif-dot"></span>' + label + ' <b>' + total + '</b>';
   }
@@ -4782,7 +4849,7 @@ function updateFilterCounts_(data) {
 function jumpToPending() {
   var order = window._statusMode
     ? ['filter-question', 'filter-approved', 'filter-idea-given']
-    : ['filter-pending', 'filter-partial', 'filter-question', 'filter-ext'];
+    : ['filter-pending', 'filter-partial', 'filter-question', 'filter-ext', 'filter-fb'];
   for (var i = 0; i < order.length; i++) {
     var b = document.getElementById(order[i]);
     if (b && b.classList.contains('has-pending')) { b.click(); return; }
@@ -4935,7 +5002,7 @@ function enterRole(role) {
   if (window._statusMode) {
     curFilter = 'approved';
     document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
-    ['filter-pending','filter-partial'].forEach(function(id){
+    ['filter-pending','filter-partial','filter-fb'].forEach(function(id){
       var b = document.getElementById(id); if (b) b.style.display = 'none';
     });
     var fb = document.getElementById('filter-approved');
