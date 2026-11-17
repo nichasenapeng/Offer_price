@@ -3457,6 +3457,8 @@ function fbApproverBlock_(d) {
 function inFilter_(d, f) {
   if (f === 'fb-new') return getStatus(d.ref) === 'idea-given' && fbUnseen_(d.ref);
   var st = getStatus(d.ref);
+  // แท็บ "รออนุมัติ" = ทุกใบที่ยังรอผู้อนุมัติ รวมใบที่ Approve 1 อนุมัติแล้วและรอ Approve 2 (แท็บ "Approve 1 แล้ว" ยังมีไว้ดูเฉพาะกลุ่มนั้น)
+  if (f === 'pending') return st === 'pending' || st === 'partial';
   if (st !== f) return false;
   return !(f === 'superseded' && biddingDone_(d.ref));
 }
@@ -4248,7 +4250,7 @@ function renderCards() {
     document.getElementById('st-appr').textContent  = cnt('closed-lost');
     document.getElementById('st-rej').textContent   = cnt('rejected');
   } else {
-    document.getElementById('st-pend').textContent = cnt('pending');
+    document.getElementById('st-pend').textContent = cnt('pending') + cnt('partial');
     document.getElementById('st-appr').textContent = cnt('approved');
     document.getElementById('st-rej').textContent  = cnt('rejected');
   }
@@ -4845,7 +4847,10 @@ function updateFilterCounts_(data) {
     var total, label;
     if (window._summaryMode) { total = 0; }
     else if (window._statusMode) { total = count('approved') + count('question') + count('idea-given'); label = 'รอคุณดำเนินการ'; }
-    else { total = count('pending') + count('partial') + count('question') + extN + fbN; label = 'รอคุณดำเนินการ'; }
+    else {
+      var raw = function(st){ return data.filter(function(d){ return getStatus(d.ref) === st; }).length; };
+      total = raw('pending') + raw('partial') + count('question') + extN + fbN; label = 'รอคุณดำเนินการ';
+    }
     pill.style.display = total ? 'inline-flex' : 'none';
     pill.innerHTML = '<span class="notif-dot"></span>' + label + ' <b>' + total + '</b>';
   }
