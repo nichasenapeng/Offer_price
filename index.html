@@ -3210,7 +3210,10 @@ function setFilter(f, btn) {
 function getStatus(ref) {
   var a = approvals[ref] || {}; var v1 = a.A1; var v2 = a.A2;
   if (a.deleted) return 'deleted';
-  if (a.close) return a.close;
+  // "ให้ไอเดียราคา" เป็นสถานะหลังอนุมัติครบ — ถ้าผู้อนุมัติยกเลิกโหวตทีหลัง (SFD-2026-2970: A2 ว่าง แต่ยังเป็น idea-given)
+  // ใบต้องกลับไปรออนุมัติ ไม่งั้นไม่อยู่ในแท็บไหนของผู้อนุมัติเลย · ข้อมูลไอเดียราคา/feedback คงไว้ใน approvals[ref].close
+  // กลับมาเป็น idea-given เองเมื่อ A1+A2 อนุมัติครบอีกครั้ง
+  if (a.close && !(a.close === 'idea-given' && !(v1 === 'approved' && v2 === 'approved'))) return a.close;
   if (a.superseded) return 'superseded';
   if (v1 === 'rejected' || v2 === 'rejected') return 'rejected';
   if (a.question) return 'question';   // ค้างคำถาม ยังปิดการขายไม่ได้
@@ -4103,7 +4106,8 @@ function vote(ref, slot, dec) {
     period:     d.period || '',
     A1:         av.A1 || '',
     A2:         av.A2 || '',
-    status:     status,
+    // ใบที่ให้ไอเดียราคาไปแล้วต้องส่งสถานะแบบมี remark/วันที่/feedback ไม่งั้นเขียนทับเป็น "idea-given" เปล่า ๆ ข้อมูลหายจากชีท
+    status:     (av.close === 'idea-given') ? ideaStatusVal_(av) : status,
     // บอก Apps Script ว่านี่คือการกดโหวตจริง ไม่ใช่การเขียนสถานะซ้ำจากที่อื่น
     // (undoClose / cancelExtRequest / restoreOffer / saveApprovedPrice ก็ส่ง approved|rejected เหมือนกัน)
     event:        'vote',
@@ -4163,7 +4167,7 @@ function saveApprovedPrice(ref, slot) {
   // สถานะรวมอาจกำลังถือคำขอขยาย VALID อยู่ อย่าเขียนทับให้หาย
   var statusVal = av.extState
     ? 'ext-' + av.extState + '|' + (av.extValid || '') + '|' + (av.extReason || '') + '|' + (av.extNote || '')
-    : (st === 'idea-given')
+    : (av.close === 'idea-given')
       ? ideaStatusVal_(av)
       : st;
   postSaleState(ref, statusVal);
@@ -4449,7 +4453,7 @@ function renderCards() {
           (av.extNote ? '<div class="ext-reason">' + av.extNote + '</div>' : '') + '</div>';
       }
       approveHtml = '<div class="approve-section">' +
-        (status === 'idea-given' ? fbApproverBlock_(d) : '') +
+        (av.close === 'idea-given' ? fbApproverBlock_(d) : '') +
         qBox + extDecide +
         '<div class="approve-slots">' +
           slotHtml('A1', dec1) +
