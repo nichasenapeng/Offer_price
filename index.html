@@ -3465,8 +3465,7 @@ function fbApproverBlock_(d) {
 function inFilter_(d, f) {
   if (f === 'fb-new') return getStatus(d.ref) === 'idea-given' && fbUnseen_(d.ref);
   var st = getStatus(d.ref);
-  // แท็บ "รออนุมัติ" = ทุกใบที่ยังรอผู้อนุมัติ รวมใบที่ Approve 1 อนุมัติแล้วและรอ Approve 2 (แท็บ "Approve 1 แล้ว" ยังมีไว้ดูเฉพาะกลุ่มนั้น)
-  if (f === 'pending') return st === 'pending' || st === 'partial';
+  // แท็บ "รออนุมัติ" = เฉพาะใบที่ยังไม่มีใครกด · ใบที่ Approve 1 อนุมัติแล้วรอ Approve 2 อยู่แท็บ "Approve 1 แล้ว" (partial) แท็บเดียว
   if (st !== f) return false;
   return !(f === 'superseded' && biddingDone_(d.ref));
 }
@@ -4258,7 +4257,7 @@ function renderCards() {
     document.getElementById('st-appr').textContent  = cnt('closed-lost');
     document.getElementById('st-rej').textContent   = cnt('rejected');
   } else {
-    document.getElementById('st-pend').textContent = cnt('pending') + cnt('partial');
+    document.getElementById('st-pend').textContent = cnt('pending');
     document.getElementById('st-appr').textContent = cnt('approved');
     document.getElementById('st-rej').textContent  = cnt('rejected');
   }
