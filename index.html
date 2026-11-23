@@ -769,6 +769,13 @@ body::before, body::after { display: none !important; }
 .fb-del{flex:0 0 auto;border:0;background:transparent;color:var(--ink-muted);font-size:16px;line-height:1;cursor:pointer;padding:0 4px}
 .fb-del:hover{color:var(--red)}
 #approve-app .fb-appr{margin:0 0 14px}
+.fb-item.fb-reply .fb-text{font-weight:600}
+.fb-item.fb-reply.ok .fb-text{color:#0f6b3b}
+.fb-item.fb-reply.no .fb-text{color:#a3202f}
+#approve-app .fb-reply-form{margin:10px 0 0;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.7);border:1px solid var(--border)}
+#approve-app .fb-reply-form .fb-reply-t{font-size:13px;font-weight:700;margin:0 0 8px;color:var(--ink)}
+#approve-app .fb-reply-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+#approve-app .fb-reply-btns .vote-btn{flex:1 1 140px}
 #approve-app .fb-appr-banner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px;padding:10px 14px;border-radius:10px;background:#FEF3C7;border:1px solid #f0c76b;color:#8a5a08;font-size:14px;font-weight:600}
 #approve-app .fb-appr-idea{margin:0 0 10px;padding:8px 14px;border-radius:10px;background:rgba(255,255,255,.7);border:1px dashed var(--border);font-size:13px;color:var(--ink-soft);white-space:pre-wrap;overflow-wrap:anywhere}
 #approve-app .fb-appr-idea b{color:var(--ink)}
@@ -3460,7 +3467,29 @@ function fbApproverBlock_(d) {
     (unseen ? '<div class="fb-appr-banner"><span>💬 ทีมขายอัปเดต feedback จากลูกค้า — ใบนี้ให้ไอเดียราคาไปแล้ว</span>' +
       '<button class="draft-btn primary" onclick="markFbSeen(\'' + d.ref + '\')">รับทราบ</button></div>' : '') +
     (av.closeRemark ? '<div class="fb-appr-idea"><b>ไอเดียราคาที่ให้ลูกค้า' + (av.closeDate ? ' (' + thaiDate(av.closeDate) + ')' : '') + ':</b> ' + draftEsc_(av.closeRemark) + '</div>' : '') +
-    fbBlock_(d, false) + '</div>';
+    fbBlock_(d, false) +
+    '<div class="fb-reply-form"><div class="fb-reply-t">ผู้อนุมัติตอบ feedback (ราคา/เงื่อนไขที่อนุมัติ หรือเหตุผล)</div>' +
+      '<textarea id="fb-reply-' + d.ref + '" class="close-input close-remark" rows="2" placeholder="เช่น อนุมัติ +50 USD/MT ตามที่ขอ / ไม่อนุมัติ ต้นทุนไม่พอ"></textarea>' +
+      '<div class="fb-reply-btns">' +
+        '<button class="vote-btn btn-approve" onclick="fbReply(\'' + d.ref + '\',\'A1\',\'อนุมัติ\')">A1 อนุมัติ</button>' +
+        '<button class="vote-btn btn-reject" onclick="fbReply(\'' + d.ref + '\',\'A1\',\'ไม่อนุมัติ\')">A1 ไม่อนุมัติ</button>' +
+        '<button class="vote-btn btn-approve" onclick="fbReply(\'' + d.ref + '\',\'A2\',\'อนุมัติ\')">A2 อนุมัติ</button>' +
+        '<button class="vote-btn btn-reject" onclick="fbReply(\'' + d.ref + '\',\'A2\',\'ไม่อนุมัติ\')">A2 ไม่อนุมัติ</button>' +
+      '</div></div></div>';
+}
+/* ผู้อนุมัติตอบ feedback — เก็บเป็นรายการ feedback ปกติ ขึ้นต้นด้วย [A1 อนุมัติ] ทีมขายเห็นในรายการเดียวกัน (ไม่เปลี่ยนรูปแบบข้อมูลในชีท) */
+function fbReply(ref, slot, dec) {
+  var av = approvals[ref];
+  if (!av || av.close !== 'idea-given') { showToast('ตอบได้เฉพาะใบที่ให้ไอเดียราคาไว้', 'red'); return; }
+  var el = document.getElementById('fb-reply-' + ref);
+  var txt = el ? el.value.trim() : '';
+  if (dec === 'ไม่อนุมัติ' && !txt) { showToast('ใส่เหตุผลก่อนกดไม่อนุมัติ', 'red'); if (el) el.focus(); return; }
+  (av.feedback = av.feedback || []).push({ d: todayISO(), t: '[' + slot + ' ' + dec + ']' + (txt ? ' ' + txt : '') });
+  av.feedback.sort(function(a, b){ return String(a.d).localeCompare(String(b.d)); });
+  fbSetSeen_(ref);
+  postSaleState(ref, ideaStatusVal_(av));
+  showToast(slot + ' ' + dec + ' — บันทึกแล้ว', dec === 'อนุมัติ' ? 'green' : 'red');
+  renderCards();
 }
 function inFilter_(d, f) {
   if (f === 'fb-new') return getStatus(d.ref) === 'idea-given' && fbUnseen_(d.ref);
@@ -3833,7 +3862,8 @@ function fbBlock_(d, editable) {
   var list = av.feedback || [];
   if (!editable && !list.length) return '';
   var items = list.map(function(e, i) {
-    return '<div class="fb-item"><span class="fb-date">' + (e.d ? thaiDate(e.d) : '—') + '</span>' +
+    var rm = String(e.t || '').match(/^\[(A1|A2) (อนุมัติ|ไม่อนุมัติ)\]/);
+    return '<div class="fb-item' + (rm ? ' fb-reply ' + (rm[2] === 'อนุมัติ' ? 'ok' : 'no') : '') + '"><span class="fb-date">' + (e.d ? thaiDate(e.d) : '—') + '</span>' +
       '<span class="fb-text">' + draftEsc_(e.t) + '</span>' +
       (editable ? '<button class="fb-del" title="ลบรายการนี้" aria-label="ลบ feedback" onclick="deleteFeedback(\'' + d.ref + '\',' + i + ')">&times;</button>' : '') +
     '</div>';
