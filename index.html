@@ -769,6 +769,7 @@ body::before, body::after { display: none !important; }
 .fb-del{flex:0 0 auto;border:0;background:transparent;color:var(--ink-muted);font-size:16px;line-height:1;cursor:pointer;padding:0 4px}
 .fb-del:hover{color:var(--red)}
 #approve-app .fb-appr{margin:0 0 14px}
+.fb-appr-banner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border-radius:10px;background:#FEF3C7;border:1px solid #f0c76b;color:#8a5a08;font-size:14px;font-weight:600}
 .fb-item.fb-reply .fb-text{font-weight:600}
 .fb-item.fb-reply.ok .fb-text{color:#0f6b3b}
 .fb-item.fb-reply.no .fb-text{color:#a3202f}
@@ -3473,6 +3474,24 @@ function fbAwait_(ref) {
   if (got.A2 && !got.A1) return 'A1';
   return '';
 }
+/* ฝั่งทีมขาย (หน้า Status): ผู้อนุมัติตอบ feedback ([A1 อนุมัติ] …) → แจ้งในแท็บ "💬 ผู้อนุมัติตอบ" จนกว่าจะกดรับทราบ (จำต่อเครื่อง) */
+var FBR_SEEN_KEY = 'sf_fbr_seen_v1';
+function fbReplySig_(ref) {
+  var list = ((approvals[ref] || {}).feedback || []).filter(function(e){ return /^\[(A1|A2) (อนุมัติ|ไม่อนุมัติ)\]/.test(String(e.t || '')); });
+  return list.length ? fbHash_(fbSerialize_(list)) : '';
+}
+function fbReplyUnseen_(ref) {
+  var sig = fbReplySig_(ref); if (!sig) return false;
+  var m = {}; try { m = JSON.parse(localStorage.getItem(FBR_SEEN_KEY) || '{}') || {}; } catch (e) {}
+  return m[ref] !== sig;
+}
+function markFbReplySeen(ref) {
+  var m = {}; try { m = JSON.parse(localStorage.getItem(FBR_SEEN_KEY) || '{}') || {}; } catch (e) {}
+  m[ref] = fbReplySig_(ref);
+  try { localStorage.setItem(FBR_SEEN_KEY, JSON.stringify(m)); } catch (e) {}
+  showToast('รับทราบคำตอบผู้อนุมัติแล้ว', 'green');
+  renderCards();
+}
 function markFbSeen(ref) {
   fbSetSeen_(ref);
   showToast('รับทราบ feedback แล้ว', 'green');
@@ -3540,6 +3559,7 @@ function fbReply(ref, slot, dec) {
   renderCards();
 }
 function inFilter_(d, f) {
+  if (f === 'fb-reply') return getStatus(d.ref) === 'idea-given' && fbReplyUnseen_(d.ref);
   if (f === 'fb-new') return getStatus(d.ref) === 'idea-given' && (fbUnseen_(d.ref) || !!fbAwait_(d.ref));
   var st = getStatus(d.ref);
   // แท็บ "รออนุมัติ" = เฉพาะใบที่ยังไม่มีใครกด · ใบที่ Approve 1 อนุมัติแล้วรอ Approve 2 อยู่แท็บ "Approve 1 แล้ว" (partial) แท็บเดียว
@@ -4632,6 +4652,8 @@ function renderCards() {
             ? '<div class="idea-note"><b>ให้ไอเดียราคาแล้ว' + (av.closeDate ? ' เมื่อ ' + thaiDate(av.closeDate) : '') + '</b> — รอติดตามผลกับลูกค้า' +
               (av.closeRemark ? '<div class="idea-remark">' + av.closeRemark + '</div>' : '') +
               '<button class="btn-undo" onclick="undoClose(\'' + d.ref + '\')">ยกเลิก</button></div>' +
+              (fbReplyUnseen_(d.ref) ? '<div class="fb-appr-banner" style="margin-top:10px"><span>💬 ผู้อนุมัติตอบ feedback แล้ว — ดูรายการสีเขียว/แดงใน Feedback ด้านล่าง</span>' +
+                '<button class="draft-btn primary" onclick="markFbReplySeen(\'' + d.ref + '\')">รับทราบ</button></div>' : '') +
               fbBlock_(d, true)
             : '') +
           '<div class="close-field close-date-wrap"><label>' + (isIdea ? 'วันที่ (ปิดการขาย / อัปเดตไอเดีย)' : 'วันที่ปิดการขาย') + '</label>' +
@@ -4920,9 +4942,9 @@ function updateFilterCounts_(data) {
     paint(document.getElementById(id), n, !!needsAction[map[id]]);
   });
 
-  var fbN = (window._statusMode || window._summaryMode) ? 0 : data.filter(function(d){ return inFilter_(d, 'fb-new'); }).length;
+  var fbN = window._summaryMode ? 0 : data.filter(function(d){ return inFilter_(d, window._statusMode ? 'fb-reply' : 'fb-new'); }).length;
   var fbBtn = document.getElementById('filter-fb');
-  if (fbBtn) { fbBtn.dataset.base = '💬 Feedback ใหม่'; paint(fbBtn, fbN, true); }
+  if (fbBtn) { fbBtn.dataset.base = window._statusMode ? '💬 ผู้อนุมัติตอบ' : '💬 Feedback ใหม่'; paint(fbBtn, fbN, true); }
 
   var extN = extPendingCount_(data);
   var extBtn = document.getElementById('filter-ext');
@@ -4936,7 +4958,7 @@ function updateFilterCounts_(data) {
   if (pill) {
     var total, label;
     if (window._summaryMode) { total = 0; }
-    else if (window._statusMode) { total = count('approved') + count('question') + count('idea-given'); label = 'รอคุณดำเนินการ'; }
+    else if (window._statusMode) { total = count('approved') + count('question') + count('idea-given') + fbN; label = 'รอคุณดำเนินการ'; }
     else {
       var raw = function(st){ return data.filter(function(d){ return getStatus(d.ref) === st; }).length; };
       total = raw('pending') + raw('partial') + count('question') + extN + fbN; label = 'รอคุณดำเนินการ';
@@ -4947,7 +4969,7 @@ function updateFilterCounts_(data) {
 }
 function jumpToPending() {
   var order = window._statusMode
-    ? ['filter-question', 'filter-approved', 'filter-idea-given']
+    ? ['filter-fb', 'filter-question', 'filter-approved', 'filter-idea-given']
     : ['filter-pending', 'filter-partial', 'filter-question', 'filter-ext', 'filter-fb'];
   for (var i = 0; i < order.length; i++) {
     var b = document.getElementById(order[i]);
@@ -5101,7 +5123,9 @@ function enterRole(role) {
   if (window._statusMode) {
     curFilter = 'approved';
     document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
-    ['filter-pending','filter-partial','filter-fb'].forEach(function(id){
+    var fbb = document.getElementById('filter-fb');
+    if (fbb) fbb.setAttribute('onclick', "setFilter('fb-reply',this)");
+    ['filter-pending','filter-partial'].forEach(function(id){
       var b = document.getElementById(id); if (b) b.style.display = 'none';
     });
     var fb = document.getElementById('filter-approved');
