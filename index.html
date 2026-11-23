@@ -3453,6 +3453,20 @@ function fbUnseen_(ref) {
   if (!list.some(function(e){ return String(e.d || '') >= cutoff; })) return false;
   return fbSeenMap_()[ref] !== fbSig_(ref);
 }
+/* ผู้อนุมัติคนหนึ่งตอบ feedback ล่าสุดแล้ว อีกคนยังไม่ตอบ → ใบค้างในแท็บ "Feedback ใหม่" จนกว่าจะครบทั้ง A1 และ A2
+   คืน 'A1' / 'A2' = คนที่ยังไม่ตอบ, '' = ไม่มีเรื่องค้าง (นับเฉพาะคำตอบหลัง feedback ของทีมขายรายการล่าสุด) */
+function fbAwait_(ref) {
+  var list = (approvals[ref] || {}).feedback || [];
+  var re = /^\[(A1|A2) (อนุมัติ|ไม่อนุมัติ)\]/;
+  var last = -1;
+  list.forEach(function(e, i){ if (!re.test(String(e.t || ''))) last = i; });
+  if (last < 0) return '';
+  var got = {};
+  list.slice(last + 1).forEach(function(e){ var m = String(e.t || '').match(re); if (m) got[m[1]] = 1; });
+  if (got.A1 && !got.A2) return 'A2';
+  if (got.A2 && !got.A1) return 'A1';
+  return '';
+}
 function markFbSeen(ref) {
   fbSetSeen_(ref);
   showToast('รับทราบ feedback แล้ว', 'green');
@@ -3463,7 +3477,9 @@ function fbApproverBlock_(d) {
   var av = approvals[d.ref] || {};
   if (!(av.feedback || []).length) return '';
   var unseen = fbUnseen_(d.ref);
+  var aw = fbAwait_(d.ref);
   return '<div class="fb-appr">' +
+    (aw ? '<div class="fb-appr-banner"><span>⏳ รอ ' + aw + ' ตอบ feedback — ใบนี้ค้างอยู่ในแท็บ Feedback ใหม่จนกว่าจะตอบครบ</span></div>' : '') +
     (unseen ? '<div class="fb-appr-banner"><span>💬 ทีมขายอัปเดต feedback จากลูกค้า — ใบนี้ให้ไอเดียราคาไปแล้ว</span>' +
       '<button class="draft-btn primary" onclick="markFbSeen(\'' + d.ref + '\')">รับทราบ</button></div>' : '') +
     (av.closeRemark ? '<div class="fb-appr-idea"><b>ไอเดียราคาที่ให้ลูกค้า' + (av.closeDate ? ' (' + thaiDate(av.closeDate) + ')' : '') + ':</b> ' + draftEsc_(av.closeRemark) + '</div>' : '') +
@@ -3492,7 +3508,7 @@ function fbReply(ref, slot, dec) {
   renderCards();
 }
 function inFilter_(d, f) {
-  if (f === 'fb-new') return getStatus(d.ref) === 'idea-given' && fbUnseen_(d.ref);
+  if (f === 'fb-new') return getStatus(d.ref) === 'idea-given' && (fbUnseen_(d.ref) || !!fbAwait_(d.ref));
   var st = getStatus(d.ref);
   // แท็บ "รออนุมัติ" = เฉพาะใบที่ยังไม่มีใครกด · ใบที่ Approve 1 อนุมัติแล้วรอ Approve 2 อยู่แท็บ "Approve 1 แล้ว" (partial) แท็บเดียว
   if (st !== f) return false;
