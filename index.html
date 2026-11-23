@@ -774,6 +774,12 @@ body::before, body::after { display: none !important; }
 .fb-item.fb-reply.no .fb-text{color:#a3202f}
 #approve-app .fb-reply-form{margin:10px 0 0;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.7);border:1px solid var(--border)}
 #approve-app .fb-reply-form .fb-reply-t{font-size:13px;font-weight:700;margin:0 0 8px;color:var(--ink)}
+#approve-app .fb-reply-row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+#approve-app .fb-reply-lbl{font-weight:700;min-width:28px;color:var(--ink-soft)}
+#approve-app .fb-reply-row .vote-btn{flex:0 1 150px}
+#approve-app .fb-reply-done{padding:7px 14px;border-radius:10px;font-weight:700;font-size:14px}
+#approve-app .fb-reply-done.ok{background:#e4f7ec;color:#0f6b3b;border:1px solid #b9e3c9}
+#approve-app .fb-reply-done.no{background:#fbe9ec;color:#a3202f;border:1px solid #efc2c9}
 #approve-app .fb-reply-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 #approve-app .fb-reply-btns .vote-btn{flex:1 1 140px}
 #approve-app .fb-appr-banner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px;padding:10px 14px;border-radius:10px;background:#FEF3C7;border:1px solid #f0c76b;color:#8a5a08;font-size:14px;font-weight:600}
@@ -3486,17 +3492,43 @@ function fbApproverBlock_(d) {
     fbBlock_(d, false) +
     '<div class="fb-reply-form"><div class="fb-reply-t">ผู้อนุมัติตอบ feedback (ราคา/เงื่อนไขที่อนุมัติ หรือเหตุผล)</div>' +
       '<textarea id="fb-reply-' + d.ref + '" class="close-input close-remark" rows="2" placeholder="เช่น อนุมัติ +50 USD/MT ตามที่ขอ / ไม่อนุมัติ ต้นทุนไม่พอ"></textarea>' +
-      '<div class="fb-reply-btns">' +
-        '<button class="vote-btn btn-approve" onclick="fbReply(\'' + d.ref + '\',\'A1\',\'อนุมัติ\')">A1 อนุมัติ</button>' +
-        '<button class="vote-btn btn-reject" onclick="fbReply(\'' + d.ref + '\',\'A1\',\'ไม่อนุมัติ\')">A1 ไม่อนุมัติ</button>' +
-        '<button class="vote-btn btn-approve" onclick="fbReply(\'' + d.ref + '\',\'A2\',\'อนุมัติ\')">A2 อนุมัติ</button>' +
-        '<button class="vote-btn btn-reject" onclick="fbReply(\'' + d.ref + '\',\'A2\',\'ไม่อนุมัติ\')">A2 ไม่อนุมัติ</button>' +
-      '</div></div></div>';
+      ['A1', 'A2'].map(function(sl) { return fbReplyRow_(d.ref, sl); }).join('') +
+    '</div></div>';
+}
+/* คำตอบของ slot นี้หลัง feedback ของทีมขายรายการล่าสุด → {dec} หรือ null (ตอบซ้ำไม่ได้ ต้องกดยกเลิกก่อน) */
+var FB_REPLY_RE = /^\[(A1|A2) (อนุมัติ|ไม่อนุมัติ)\]/;
+function fbReplyOf_(ref, slot) {
+  var list = (approvals[ref] || {}).feedback || [], last = -1, got = null;
+  list.forEach(function(e, i){ if (!FB_REPLY_RE.test(String(e.t || ''))) last = i; });
+  list.slice(last + 1).forEach(function(e){ var m = String(e.t || '').match(FB_REPLY_RE); if (m && m[1] === slot) got = { dec: m[2] }; });
+  return got;
+}
+function fbReplyRow_(ref, slot) {
+  var r = fbReplyOf_(ref, slot);
+  if (r) {
+    var ok = r.dec === 'อนุมัติ';
+    return '<div class="fb-reply-row"><span class="fb-reply-done ' + (ok ? 'ok' : 'no') + '">' + slot + ' ' + r.dec + 'แล้ว</span>' +
+      '<button class="btn-undo" onclick="fbReplyUndo(\'' + ref + '\',\'' + slot + '\')">ยกเลิก</button></div>';
+  }
+  return '<div class="fb-reply-row"><span class="fb-reply-lbl">' + slot + '</span>' +
+    '<button class="vote-btn btn-approve" onclick="fbReply(\'' + ref + '\',\'' + slot + '\',\'อนุมัติ\')">อนุมัติ</button>' +
+    '<button class="vote-btn btn-reject" onclick="fbReply(\'' + ref + '\',\'' + slot + '\',\'ไม่อนุมัติ\')">ไม่อนุมัติ</button></div>';
+}
+/* ยกเลิกคำตอบของ slot นี้ (ลบทุกรายการ [slot …] หลัง feedback ล่าสุดของทีมขาย รวมที่กดซ้ำ) */
+function fbReplyUndo(ref, slot) {
+  var av = approvals[ref]; if (!av || !av.feedback) return;
+  var last = -1;
+  av.feedback.forEach(function(e, i){ if (!FB_REPLY_RE.test(String(e.t || ''))) last = i; });
+  av.feedback = av.feedback.filter(function(e, i){ var m = String(e.t || '').match(FB_REPLY_RE); return !(i > last && m && m[1] === slot); });
+  postSaleState(ref, ideaStatusVal_(av));
+  showToast('ยกเลิก ' + slot + ' แล้ว — บันทึกลงชีทแล้ว');
+  renderCards();
 }
 /* ผู้อนุมัติตอบ feedback — เก็บเป็นรายการ feedback ปกติ ขึ้นต้นด้วย [A1 อนุมัติ] ทีมขายเห็นในรายการเดียวกัน (ไม่เปลี่ยนรูปแบบข้อมูลในชีท) */
 function fbReply(ref, slot, dec) {
   var av = approvals[ref];
   if (!av || av.close !== 'idea-given') { showToast('ตอบได้เฉพาะใบที่ให้ไอเดียราคาไว้', 'red'); return; }
+  if (fbReplyOf_(ref, slot)) { showToast(slot + ' ตอบไปแล้ว — กดยกเลิกก่อนถ้าจะเปลี่ยน', 'red'); return; }
   var el = document.getElementById('fb-reply-' + ref);
   var txt = el ? el.value.trim() : '';
   if (dec === 'ไม่อนุมัติ' && !txt) { showToast('ใส่เหตุผลก่อนกดไม่อนุมัติ', 'red'); if (el) el.focus(); return; }
