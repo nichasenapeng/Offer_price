@@ -4166,6 +4166,11 @@ function vote(ref, slot, dec) {
       ? (autoA1 ? 'A2 อนุมัติสำเร็จ — Approve 1 อนุมัติให้อัตโนมัติ ใบนี้อนุมัติครบแล้ว'
                 : '' + slot + ' อนุมัติสำเร็จ — บันทึกแล้ว')
       : '' + slot + ' ปฏิเสธ — บันทึกแล้ว', dec === 'approved' ? 'green' : 'red');
+  // A1 อนุมัติแล้วใบไปรอ A2 (partial) จะหลุดจากแท็บ "รออนุมัติ" — พาไปแท็บ "Approve 1 แล้ว" ทันที ใบจะได้ไม่หายไปจากหน้าจอ
+  if (status === 'partial' && curFilter === 'pending') {
+    var pb = document.getElementById('filter-partial');
+    if (pb) { showToast(slot + ' อนุมัติแล้ว — ใบนี้รอ Approve 2 อยู่ที่แท็บ "Approve 1 แล้ว"', 'green'); setFilter('partial', pb); return; }
+  }
   renderCards();
 }
 
