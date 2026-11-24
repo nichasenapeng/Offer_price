@@ -3956,7 +3956,7 @@ function addFeedback(ref) {
   if (!text) { showToast('พิมพ์ feedback ก่อน', 'red'); if (tEl) tEl.focus(); return; }
   (av.feedback = av.feedback || []).push({ d: (dEl && dEl.value) || todayISO(), t: text });
   av.feedback.sort(function(a, b){ return String(a.d).localeCompare(String(b.d)); });   // เรียงตามวันที่ ใส่ย้อนหลังก็ไม่ลำดับเพี้ยน
-  fbSetSeen_(ref);   // คนเพิ่มเองไม่ต้องเห็นเป็น "ใหม่" บนเครื่องตัวเอง
+  // ไม่ fbSetSeen_ — ถ้าคนเดียวกันเป็นทั้งทีมขายและผู้อนุมัติบนเบราว์เซอร์เดียว feedback จะถูกนับว่ารับทราบแล้วและไม่ขึ้นในแท็บ Feedback ใหม่ ผู้อนุมัติต้องกดรับทราบเอง
   postSaleState(ref, ideaStatusVal_(av));
   showToast('เพิ่ม feedback แล้ว', 'green');
   renderCards();
