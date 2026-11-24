@@ -3445,7 +3445,7 @@ function biddingDone_(ref) {
    การ์ดไอเดียราคาไม่ได้อยู่ในหน้า Approve (ผู้อนุมัติตัดสินไปแล้ว) ทีมขายเพิ่ม feedback ผู้อนุมัติจึงไม่เห็น
    แท็บ "💬 Feedback ใหม่" แสดงใบที่มี feedback ที่ยังไม่เคยกดรับทราบ — จำต่อเครื่อง (localStorage) เพราะ A1/A2 คนละเครื่อง
    ต่างคนต่างเห็นแจ้งเตือนของตัวเองจนกว่าจะกดรับทราบ · นับเฉพาะ feedback ที่ลงวันที่ภายใน FB_NEW_DAYS วัน ไม่งั้นของเก่าทั้งหมดจะโผล่เป็น "ใหม่" ตอนเปิดครั้งแรก */
-var FB_SEEN_KEY = 'sf_fb_seen_v1', FB_NEW_DAYS = 14;
+var FB_SEEN_KEY = 'sf_fb_seen_v2', FB_NEW_DAYS = 14;
 function fbHash_(str) { var h = 5381; for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return String(h); }
 function fbSig_(ref) { return fbHash_(fbSerialize_((approvals[ref] || {}).feedback)); }
 function fbSeenMap_() { try { return JSON.parse(localStorage.getItem(FB_SEEN_KEY) || '{}') || {}; } catch (e) { return {}; } }
